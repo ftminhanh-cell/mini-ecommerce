@@ -6,10 +6,6 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP DATABASE IF EXISTS ecommerce_db;
-CREATE DATABASE ecommerce_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE ecommerce_db;
-
 -- =========================================================
 -- 1. TẠO BẢNG DỮ LIỆU
 -- =========================================================
