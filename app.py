@@ -22,10 +22,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 DB_CONFIG = {
-    "host": os.getenv("MYSQL_HOST", "localhost"),
+    "host": os.getenv("MYSQL_HOST", "localhost").replace("mysql://", "").replace("://", ""),
     "port": int(os.getenv("MYSQL_PORT", "3306")),
     "user": os.getenv("MYSQL_USER", "root"),
-    "password": os.getenv("MYSQL_PASSWORD", "minhyeuanh2k7?"),  # Mật khẩu MySQL của bạn
+    "password": os.getenv("MYSQL_PASSWORD", "minhyeuanh2k7?"),
     "database": os.getenv("MYSQL_DATABASE", "ecommerce_db"),
     "charset": "utf8mb4",
 }
