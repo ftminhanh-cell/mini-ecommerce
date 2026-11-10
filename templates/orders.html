@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Đơn Hàng Của Tôi</h3>
+
+<div class="table-responsive bg-white rounded-3 shadow-sm p-3">
+<table class="table table-hover align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>Mã ĐH</th>
+            <th>Sản phẩm</th>
+            <th>Ngày đặt</th>
+            <th>Địa chỉ giao</th>
+            <th>Tổng tiền</th>
+            <th>Trạng thái</th>
+            <th>Thao tác</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for o in orders %}
+        <tr>
+            <td><strong>#{{ o.order_id }}</strong></td>
+            <td>{{ o.product_name }}</td>
+            <td>{{ o.order_date }}</td>
+            <td>{{ o.shipping_address }}</td>
+            <td class="fw-bold text-danger">{{ "{:,.0f}".format(o.final_amount) }} đ</td>
+            <td>
+                {% if o.status == 'Da huy' %}
+                <span class="badge bg-danger">Đã hủy</span>
+                {% elif o.status == 'Da giao' %}
+                <span class="badge bg-success">Đã giao</span>
+                {% else %}
+                <span class="badge bg-warning text-dark">{{ o.status }}</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if o.status == 'Cho xac nhan' %}
+                <form action="/orders/cancel/{{ o.order_id }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn hủy đơn này?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Hủy đơn</button>
+                </form>
+                {% elif o.status == 'Da giao' and not o.review_id %}
+                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#reviewModal{{ o.order_detail_id }}">
+                    <i class="bi bi-star"></i> Đánh giá
+                </button>
+
+                <!-- Modal Form Đánh giá -->
+                <div class="modal fade" id="reviewModal{{ o.order_detail_id }}" tabindex="-1">
+                  <div class="modal-dialog">
+                    <form action="/review/add" method="POST" class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Đánh giá: {{ o.product_name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body">
+                        <input type="hidden" name="order_detail_id" value="{{ o.order_detail_id }}">
+                        <div class="mb-3">
+                            <label class="form-label">Chọn số sao:</label>
+                            <select name="rating" class="form-select" required>
+                                <option value="5">5 Sao - Rất hài lòng</option>
+                                <option value="4">4 Sao - Hài lòng</option>
+                                <option value="3">3 Sao - Bình thường</option>
+                                <option value="2">2 Sao - Không hài lòng</option>
+                                <option value="1">1 Sao - Rất tệ</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nhận xét:</label>
+                            <textarea name="comment" class="form-control" rows="3" placeholder="Viết cảm nhận của bạn..."></textarea>
+                        </div>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Gửi đánh giá</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+                {% elif o.review_id %}
+                <span class="text-success"><i class="bi bi-check-circle"></i> Đã đánh giá</span>
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center py-4 text-muted">Bạn chưa mua đơn hàng nào.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

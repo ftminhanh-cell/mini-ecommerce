@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-shop-window me-2"></i>Kênh Người Bán</h3>
+
+{% if not seller %}
+<div class="card p-4 col-md-6 mx-auto shadow-sm rounded-4">
+    <h4 class="fw-bold">Đăng ký mở Shop</h4>
+    <form method="POST">
+        <div class="mb-3"><label class="form-label">Tên Shop:</label><input type="text" name="shop_name" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Mã số thuế:</label><input type="text" name="tax_code" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Số CCCD:</label><input type="text" name="cccd" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Địa chỉ Shop:</label><input type="text" name="address" class="form-control" required></div>
+        <button type="submit" class="btn btn-primary w-100">Gửi hồ sơ duyệt</button>
+    </form>
+</div>
+{% elif not seller.approved_at %}
+<div class="alert alert-warning">Hồ sơ Shop <strong>{{ seller.shop_name }}</strong> đang được Quản trị viên duyệt!</div>
+{% else %}
+<div class="alert alert-success d-flex justify-content-between align-items-center shadow-sm">
+    <span><i class="bi bi-patch-check-fill text-success me-2"></i>Shop: <strong>{{ seller.shop_name }}</strong> (Đã kích hoạt)</span>
+</div>
+
+<ul class="nav nav-pills mb-3 bg-white p-2 rounded-3 shadow-sm" id="sellerTab">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#orders-tab">Đơn bán</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#products-tab">Sản phẩm</button></li>
+    <li class="nav-item"><button class="nav-link text-primary fw-bold" data-bs-toggle="tab" data-bs-target="#add-product-tab">+ Thêm SP (Upload ảnh)</button></li>
+    <li class="nav-item"><button class="nav-link text-info fw-bold" data-bs-toggle="tab" data-bs-target="#add-variant-tab">+ Thêm Biến thể</button></li>
+    <li class="nav-item"><button class="nav-link text-success fw-bold" data-bs-toggle="tab" data-bs-target="#restock-tab">+ Nhập kho (PO)</button></li>
+    <li class="nav-item"><button class="nav-link text-warning fw-bold" data-bs-toggle="tab" data-bs-target="#promo-tab">+ Tạo Voucher</button></li>
+</ul>
+
+<div class="tab-content">
+    <!-- TAB 1: ĐƠN HÀNG BÁN -->
+    <div class="tab-pane fade show active bg-white p-3 rounded-3 shadow-sm" id="orders-tab">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr><th>Mã ĐH</th><th>Khách hàng</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Trạng thái</th><th>Cập nhật</th></tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr>
+                    <td>#{{ o.order_id }}</td>
+                    <td>{{ o.customer }}</td>
+                    <td>{{ o.order_date }}</td>
+                    <td class="fw-bold text-danger">{{ "{:,.0f}".format(o.final_amount) }} đ</td>
+                    <td><span class="badge bg-warning text-dark">{{ o.status }}</span></td>
+                    <td>
+                        <form action="/seller/order/update/{{ o.order_id }}" method="POST" class="d-flex">
+                            <select name="status" class="form-select form-select-sm me-1">
+                                <option value="Da xac nhan" {% if o.status == 'Da xac nhan' %}selected{% endif %}>Đã xác nhận</option>
+                                <option value="Dang giao" {% if o.status == 'Dang giao' %}selected{% endif %}>Đang giao</option>
+                                <option value="Da giao" {% if o.status == 'Da giao' %}selected{% endif %}>Đã giao</option>
+                                <option value="Da huy" {% if o.status == 'Da huy' %}selected{% endif %}>Hủy đơn</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary">Lưu</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted">Chưa có đơn bán nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TAB 2: DANH SÁCH SẢN PHẨM -->
+    <div class="tab-pane fade bg-white p-3 rounded-3 shadow-sm" id="products-tab">
+        <table class="table table-striped align-middle">
+            <thead><tr><th>Mã SP</th><th>Ảnh</th><th>Tên sản phẩm</th><th>Danh mục</th><th>Trạng thái</th></tr></thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td>{{ p.product_id }}</td>
+                    <td>
+                        {% if p.image_url %}
+                        <img src="/static/uploads/{{ p.image_url }}" width="40" height="40" class="rounded object-fit-cover">
+                        {% else %}<i class="bi bi-image text-muted"></i>{% endif %}
+                    </td>
+                    <td><strong>{{ p.product_name }}</strong></td>
+                    <td>{{ p.categories_name }}</td>
+                    <td>
+                        {% if p.approval_status == 'Da duyet' %}<span class="badge bg-success">Đã duyệt</span>
+                        {% else %}<span class="badge bg-secondary">Chờ duyệt</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TAB 3: THÊM SẢN PHẨM MỚI KÈM UPLOAD ẢNH -->
+    <div class="tab-pane fade bg-white p-4 rounded-3 shadow-sm col-md-8" id="add-product-tab">
+        <h5 class="fw-bold text-primary mb-3">Đăng bán sản phẩm mới</h5>
+        <form action="/seller/product/add" method="POST" enctype="multipart/form-data">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Danh mục:</label>
+                    <select name="category_id" class="form-select" required>
+                        {% for c in categories %}<option value="{{ c.categories_id }}">{{ c.categories_name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Thương hiệu:</label>
+                    <select name="brand_id" class="form-select">
+                        <option value="">-- Chọn --</option>
+                        {% for b in brands %}<option value="{{ b.brand_id }}">{{ b.brand_name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="mb-3"><label class="form-label">Tên sản phẩm:</label><input type="text" name="product_name" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Ảnh sản phẩm:</label><input type="file" name="image" class="form-control" accept="image/*"></div>
+            <div class="mb-3"><label class="form-label">Mô tả:</label><textarea name="description" class="form-control" rows="2"></textarea></div>
+            
+            <h6 class="fw-bold text-secondary mt-3">Biến thể ban đầu:</h6>
+            <div class="row mb-3">
+                <div class="col-md-4"><label>Mã SKU:</label><input type="text" name="sku" class="form-control" required placeholder="SP01-TR-M"></div>
+                <div class="col-md-4"><label>Size:</label><input type="text" name="size" class="form-control" placeholder="M, L, XL"></div>
+                <div class="col-md-4"><label>Màu:</label><input type="text" name="color" class="form-control" placeholder="Trắng, Đen"></div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6"><label>Giá bán (đ):</label><input type="number" name="price" class="form-control" required min="0"></div>
+                <div class="col-md-6"><label>Số lượng tồn kho:</label><input type="number" name="quantity" class="form-control" required min="0"></div>
+            </div>
+            <button type="submit" class="btn btn-success">Đăng sản phẩm</button>
+        </form>
+    </div>
+
+    <!-- TAB 4: THÊM BIẾN THỂ -->
+    <div class="tab-pane fade bg-white p-4 rounded-3 shadow-sm col-md-6" id="add-variant-tab">
+        <h5 class="fw-bold text-info mb-3">Thêm Biến thể mới cho SP sẵn có</h5>
+        <form action="/seller/variant/add" method="POST">
+            <div class="mb-3">
+                <label>Chọn sản phẩm:</label>
+                <select name="product_id" class="form-select" required>
+                    {% for p in products %}<option value="{{ p.product_id }}">{{ p.product_name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="mb-3"><label>Mã SKU mới:</label><input type="text" name="sku" class="form-control" required></div>
+            <div class="row mb-3">
+                <div class="col-6"><label>Size:</label><input type="text" name="size" class="form-control"></div>
+                <div class="col-6"><label>Màu sắc:</label><input type="text" name="color" class="form-control"></div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-6"><label>Giá bán (đ):</label><input type="number" name="price" class="form-control" required></div>
+                <div class="col-6"><label>Tồn kho:</label><input type="number" name="quantity" class="form-control" required></div>
+            </div>
+            <button type="submit" class="btn btn-info text-white">Thêm biến thể</button>
+        </form>
+    </div>
+
+    <!-- TAB 5: NHẬP KHO (PO) -->
+    <div class="tab-pane fade bg-white p-4 rounded-3 shadow-sm col-md-6" id="restock-tab">
+        <h5 class="fw-bold text-success mb-3">Tạo đơn nhập kho (Nhập thêm hàng)</h5>
+        <form action="/seller/purchase_order" method="POST">
+            <div class="mb-3">
+                <label>Chọn SKU nhập hàng:</label>
+                <select name="vari_id" class="form-select" required>
+                    {% for v in variants %}<option value="{{ v.vari_id }}">{{ v.product_name }} - {{ v.sku }} (Hiện có: {{ v.quantity }})</option>{% endfor %}
+                </select>
+            </div>
+            <div class="mb-3"><label>Số lượng nhập thêm:</label><input type="number" name="quantity" class="form-control" min="1" required></div>
+            <div class="mb-3"><label>Giá vốn nhập (đ/món):</label><input type="number" name="unit_cost" class="form-control" required placeholder="80000"></div>
+            <button type="submit" class="btn btn-primary">Xác nhận Nhập kho</button>
+        </form>
+    </div>
+
+    <!-- TAB 6: TẠO VOUCHER -->
+    <div class="tab-pane fade bg-white p-4 rounded-3 shadow-sm col-md-6" id="promo-tab">
+        <h5 class="fw-bold text-warning mb-3">Tạo Mã Voucher Khuyến Mãi</h5>
+        <form action="/seller/promotion/add" method="POST">
+            <div class="mb-3">
+                <label>Áp dụng cho Sản phẩm:</label>
+                <select name="product_id" class="form-select" required>
+                    {% for p in products %}<option value="{{ p.product_id }}">{{ p.product_name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="mb-3"><label>Mã Voucher (Code):</label><input type="text" name="code" class="form-control" required placeholder="VD: SALE10"></div>
+            <div class="row mb-3">
+                <div class="col-6"><label>Giảm (%):</label><input type="number" name="discount_percent" class="form-control" value="0"></div>
+                <div class="col-6"><label>Hoặc giảm (tiền đ):</label><input type="number" name="discount_amount" class="form-control" value="0"></div>
+            </div>
+            <button type="submit" class="btn btn-warning text-dark fw-bold">Tạo Voucher</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

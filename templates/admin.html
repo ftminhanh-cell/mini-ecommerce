@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-shield-lock-fill text-danger me-2"></i>Panel Quản Trị Viên</h3>
+
+<!-- QUẢN LÝ TẤT CẢ ĐƠN HÀNG HỆ THỐNG -->
+<div class="card p-3 shadow-sm border-0 mb-4">
+    <h5 class="fw-bold text-dark mb-3"><i class="bi bi-receipt me-2 text-primary"></i>Quản lý Đơn hàng Toàn Hệ thống</h5>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Mã ĐH</th>
+                    <th>Thông tin Khách hàng</th>
+                    <th>Sản phẩm mua</th>
+                    <th>Shop bán</th>
+                    <th>Số lượng</th>
+                    <th>Tổng tiền</th>
+                    <th>Ngày đặt</th>
+                    <th>Trạng thái</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in all_orders %}
+                <tr>
+                    <td><strong>#{{ o.order_id }}</strong></td>
+                    <td>
+                        <strong class="text-primary">{{ o.customer_name }}</strong><br>
+                        <small class="text-muted"><i class="bi bi-telephone"></i> {{ o.customer_phone or 'Chưa có SĐT' }}</small><br>
+                        <small class="text-muted"><i class="bi bi-geo-alt"></i> {{ o.shipping_address }}</small>
+                    </td>
+                    <td><strong>{{ o.product_name }}</strong></td>
+                    <td><span class="badge bg-info text-dark">{{ o.shop_name }}</span></td>
+                    <td class="text-center">{{ o.quantity }}</td>
+                    <td class="fw-bold text-danger">{{ "{:,.0f}".format(o.final_amount) }} đ</td>
+                    <td><small>{{ o.order_date }}</small></td>
+                    <td>
+                        {% if o.status == 'Da huy' %}
+                        <span class="badge bg-danger">Đã hủy</span>
+                        {% elif o.status == 'Da giao' %}
+                        <span class="badge bg-success">Đã giao</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">{{ o.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-3">Chưa có đơn hàng nào trên hệ thống.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- SHOP CHỜ DUYỆT -->
+    <div class="col-md-5">
+        <div class="card p-3 shadow-sm border-0 h-100">
+            <h5 class="fw-bold"><i class="bi bi-shop me-2 text-warning"></i>Hồ sơ Shop chờ duyệt</h5>
+            <ul class="list-group list-group-flush">
+                {% for s in sellers %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ s.shop_name }}</strong><br><small class="text-muted">Chủ: {{ s.full_name }}</small>
+                    </div>
+                    <a href="/admin/approve_seller/{{ s.seller_id }}" class="btn btn-sm btn-success">Duyệt Shop</a>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">Không có hồ sơ shop nào chờ duyệt.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- SẢN PHẨM CHỜ DUYỆT (CÓ XEM TRƯỚC VÀ KIỂM DUYỆT ẢNH) -->
+    <div class="col-md-7">
+        <div class="card p-3 shadow-sm border-0 h-100">
+            <h5 class="fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i>Kiểm duyệt Sản phẩm & Ảnh</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Ảnh xem trước</th><th>Thông tin SP</th><th>Thao tác</th></tr></thead>
+                    <tbody>
+                        {% for p in products %}
+                        <tr>
+                            <td width="90">
+                                {% if p.image_url %}
+                                <img src="/static/uploads/{{ p.image_url }}" class="rounded border object-fit-cover" width="70" height="70">
+                                {% else %}
+                                <div class="bg-light rounded border text-center py-3 text-muted" style="width:70px;"><i class="bi bi-image"></i></div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ p.product_name }}</strong><br>
+                                <small class="text-muted">Shop: {{ p.shop_name }}</small>
+                            </td>
+                            <td>
+                                <a href="/admin/approve_product/{{ p.product_id }}" class="btn btn-sm btn-success me-1"><i class="bi bi-check-lg"></i> Duyệt</a>
+                                <a href="/admin/reject_product/{{ p.product_id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Từ chối duyệt SP này?');"><i class="bi bi-x-lg"></i> Tu choi</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted text-center py-3">Không có sản phẩm nào chờ duyệt.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-3">
+    <!-- THÊM DANH MỤC & THƯƠNG HIỆU -->
+    <div class="col-md-6">
+        <div class="card p-3 shadow-sm border-0 mb-3">
+            <h6 class="fw-bold">+ Thêm Danh mục sản phẩm</h6>
+            <form action="/admin/category/add" method="POST" class="d-flex">
+                <input type="text" name="categories_name" class="form-control me-2" placeholder="Tên danh mục mới" required>
+                <button type="submit" class="btn btn-primary btn-sm text-nowrap">Thêm</button>
+            </form>
+        </div>
+        <div class="card p-3 shadow-sm border-0">
+            <h6 class="fw-bold">+ Thêm Thương hiệu</h6>
+            <form action="/admin/brand/add" method="POST">
+                <input type="text" name="brand_name" class="form-control mb-2" placeholder="Tên thương hiệu" required>
+                <input type="text" name="company_name" class="form-control mb-2" placeholder="Tên công ty">
+                <button type="submit" class="btn btn-primary btn-sm w-100">Thêm Thương hiệu</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- QUẢN LÝ TÀI KHOẢN -->
+    <div class="col-md-6">
+        <div class="card p-3 shadow-sm border-0">
+            <h5 class="fw-bold"><i class="bi bi-people me-2"></i>Quản lý Tài khoản Khách hàng</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>User</th><th>Tên</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>{{ u.username }}</td>
+                            <td>{{ u.full_name }}</td>
+                            <td>
+                                {% if u.status == 'Hoat dong' %}<span class="badge bg-success">Hoạt động</span>
+                                {% else %}<span class="badge bg-danger">Đã khóa</span>{% endif %}
+                            </td>
+                            <td>
+                                <a href="/admin/user/toggle/{{ u.user_id }}" class="btn btn-xs btn-outline-dark btn-sm">
+                                    {% if u.status == 'Hoat dong' %}Khóa{% else %}Mở khóa{% endif %}
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
