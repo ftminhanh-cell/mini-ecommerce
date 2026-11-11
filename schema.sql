@@ -6,6 +6,9 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+CREATE DATABASE IF NOT EXISTS ecommerce_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE ecommerce_db;
+
 -- =========================================================
 -- 1. TẠO BẢNG DỮ LIỆU
 -- =========================================================
@@ -60,6 +63,7 @@ CREATE TABLE users (
     phone VARCHAR(20),
     email VARCHAR(150) NOT NULL UNIQUE,
     address VARCHAR(255),
+    avatar_url VARCHAR(255) NULL,
     rank_id INT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'Hoat dong',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -76,6 +80,8 @@ CREATE TABLE sellers (
     address VARCHAR(255),
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     approved_at TIMESTAMP NULL,
+    commission_rate DECIMAL(5,2) NULL,
+    CONSTRAINT chk_seller_commission CHECK (commission_rate IS NULL OR commission_rate BETWEEN 0 AND 100),
     CONSTRAINT fk_seller_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_seller_admin FOREIGN KEY (approved_by) REFERENCES admin_user(admin_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -93,6 +99,8 @@ CREATE TABLE categories (
     parent_id INT NULL,
     categories_name VARCHAR(150) NOT NULL,
     slug VARCHAR(180) NOT NULL UNIQUE,
+    commission_rate DECIMAL(5,2) NULL,
+    CONSTRAINT chk_category_commission CHECK (commission_rate IS NULL OR commission_rate BETWEEN 0 AND 100),
     CONSTRAINT fk_category_parent FOREIGN KEY (parent_id) REFERENCES categories(categories_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
@@ -111,13 +119,16 @@ CREATE TABLE products (
     brand_id INT NULL,
     product_name VARCHAR(255) NOT NULL,
     description TEXT,
+    image_url VARCHAR(255) DEFAULT NULL,
+    commission_rate DECIMAL(5,2) NULL,
     approval_status VARCHAR(30) NOT NULL DEFAULT 'Cho duyet',
     approved_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_product_category FOREIGN KEY (category_id) REFERENCES categories(categories_id),
     CONSTRAINT fk_product_admin FOREIGN KEY (approved_by) REFERENCES admin_user(admin_id) ON DELETE SET NULL,
     CONSTRAINT fk_product_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id),
-    CONSTRAINT fk_product_brand FOREIGN KEY (brand_id) REFERENCES brands(brand_id) ON DELETE SET NULL
+    CONSTRAINT fk_product_brand FOREIGN KEY (brand_id) REFERENCES brands(brand_id) ON DELETE SET NULL,
+    CONSTRAINT chk_product_commission CHECK (commission_rate IS NULL OR commission_rate BETWEEN 0 AND 100)
 ) ENGINE=InnoDB;
 
 CREATE TABLE product_vari (
@@ -200,12 +211,169 @@ CREATE TABLE order_details (
     quantity INT NOT NULL,
     unit_price DECIMAL(15,2) NOT NULL,
     subtotal DECIMAL(15,2) NOT NULL,
+    commission_rate DECIMAL(5,2) NOT NULL DEFAULT 5.00,
+    commission_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    seller_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
     CONSTRAINT chk_od_quantity CHECK (quantity > 0),
     CONSTRAINT chk_od_price CHECK (unit_price >= 0),
     CONSTRAINT chk_od_subtotal CHECK (subtotal >= 0),
     CONSTRAINT fk_od_order FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
     CONSTRAINT fk_od_vari FOREIGN KEY (vari_id) REFERENCES product_vari(vari_id)
 ) ENGINE=InnoDB;
+
+CREATE TABLE platform_settings (
+    setting_id TINYINT PRIMARY KEY,
+    commission_rate DECIMAL(5,2) NOT NULL DEFAULT 5.00,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT chk_platform_commission CHECK (commission_rate BETWEEN 0 AND 100)
+) ENGINE=InnoDB;
+
+CREATE TABLE seller_wallet (
+    seller_id INT PRIMARY KEY,
+    balance DECIMAL(15,2) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_wallet_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE commission_records (
+    commission_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_detail_id INT NOT NULL UNIQUE,
+    seller_id INT NOT NULL,
+    order_id INT NOT NULL,
+    commission_base DECIMAL(15,2) NOT NULL,
+    commission_rate DECIMAL(5,2) NOT NULL,
+    commission_amount DECIMAL(15,2) NOT NULL,
+    seller_amount DECIMAL(15,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_comm_od FOREIGN KEY (order_detail_id) REFERENCES order_details(order_detail_id),
+    CONSTRAINT fk_comm_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id),
+    CONSTRAINT fk_comm_order FOREIGN KEY (order_id) REFERENCES orders(order_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE withdrawal_requests (
+    withdrawal_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    seller_id INT NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    bank_name VARCHAR(120) NOT NULL,
+    account_number VARCHAR(50) NOT NULL,
+    account_name VARCHAR(120) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Cho duyet',
+    admin_note VARCHAR(255),
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP NULL,
+    CONSTRAINT fk_withdraw_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE wallet_transactions (
+    transaction_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    seller_id INT NOT NULL,
+    order_detail_id INT NULL,
+    withdrawal_id BIGINT NULL,
+    transaction_type VARCHAR(30) NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    note VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_wallet_tx_seller (seller_id, created_at),
+    CONSTRAINT fk_wtx_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE notifications (
+    notification_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(160) NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    target_url VARCHAR(255) NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_notification_user (user_id, is_read, created_at),
+    CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE return_requests (
+    return_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    order_detail_id INT NOT NULL,
+    user_id INT NOT NULL,
+    seller_id INT NOT NULL,
+    quantity INT NOT NULL,
+    reason VARCHAR(500) NOT NULL,
+    evidence_url VARCHAR(255) NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'Cho xu ly',
+    seller_note VARCHAR(500) NULL,
+    refund_amount DECIMAL(15,2) NULL,
+    refund_reference VARCHAR(150) NULL,
+    refunded_at TIMESTAMP NULL,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP NULL,
+    INDEX idx_return_seller (seller_id, status, requested_at),
+    CONSTRAINT fk_return_order FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    CONSTRAINT fk_return_detail FOREIGN KEY (order_detail_id) REFERENCES order_details(order_detail_id),
+    CONSTRAINT fk_return_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_return_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE commission_refunds (
+    refund_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    return_id BIGINT NOT NULL UNIQUE,
+    seller_id INT NOT NULL,
+    commission_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    seller_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    total_refund DECIMAL(15,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_comm_refund_return FOREIGN KEY (return_id) REFERENCES return_requests(return_id),
+    CONSTRAINT fk_comm_refund_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE events (
+    event_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(180) NOT NULL,
+    slug VARCHAR(200) NOT NULL UNIQUE,
+    description TEXT NULL,
+    banner_url VARCHAR(255) NULL,
+    start_at DATETIME NOT NULL,
+    end_at DATETIME NOT NULL,
+    status ENUM('Draft','Published','Cancelled') NOT NULL DEFAULT 'Draft',
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_event_dates (status,start_at,end_at),
+    CONSTRAINT fk_event_admin FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE event_products (
+    event_id INT NOT NULL,
+    product_id INT NOT NULL,
+    discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
+    PRIMARY KEY (event_id, product_id),
+    CONSTRAINT fk_event_product_event FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+    CONSTRAINT fk_event_product_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    CHECK (discount_percent BETWEEN 0 AND 90)
+) ENGINE=InnoDB;
+
+CREATE TABLE event_nominations (
+    nomination_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    product_id INT NOT NULL,
+    seller_id INT NOT NULL,
+    discount_percent DECIMAL(5,2) NOT NULL,
+    committed_stock INT NOT NULL DEFAULT 0,
+    status ENUM('Pending','Approved','Rejected','Withdrawn') NOT NULL DEFAULT 'Pending',
+    seller_note VARCHAR(500) NULL,
+    admin_note VARCHAR(500) NULL,
+    reviewed_by INT NULL,
+    reviewed_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_event_product_nomination (event_id, product_id),
+    INDEX idx_nomination_review (status, created_at),
+    CONSTRAINT fk_nom_event FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+    CONSTRAINT fk_nom_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    CONSTRAINT fk_nom_seller FOREIGN KEY (seller_id) REFERENCES sellers(seller_id) ON DELETE CASCADE,
+    CONSTRAINT fk_nom_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CHECK (discount_percent BETWEEN 1 AND 90),
+    CHECK (committed_stock >= 0)
+) ENGINE=InnoDB;
+
 
 CREATE TABLE payment (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -217,6 +385,18 @@ CREATE TABLE payment (
     paid_at TIMESTAMP NULL,
     CONSTRAINT chk_payment_amount CHECK (amount >= 0),
     CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE payment_events (
+    event_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT NOT NULL,
+    provider VARCHAR(20) NOT NULL,
+    provider_transaction_id VARCHAR(150) NULL,
+    event_type VARCHAR(50) NOT NULL,
+    payload JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_payment_event_payment (payment_id, created_at),
+    CONSTRAINT fk_payment_event_payment FOREIGN KEY (payment_id) REFERENCES payment(payment_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE shipping_method (
@@ -252,6 +432,29 @@ CREATE TABLE product_review (
     CONSTRAINT uq_review_order_detail UNIQUE (order_detail_id)
 ) ENGINE=InnoDB;
 
+CREATE TABLE cart_items (
+    cart_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    vari_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_cart_quantity CHECK (quantity > 0),
+    CONSTRAINT uq_cart_user_vari UNIQUE (user_id, vari_id),
+    CONSTRAINT fk_cart_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_cart_vari FOREIGN KEY (vari_id) REFERENCES product_vari(vari_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE wishlist (
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, product_id),
+    CONSTRAINT fk_wish_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_wish_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+INSERT INTO platform_settings (setting_id, commission_rate) VALUES (1, 5.00);
+
 -- =========================================================
 -- 2. INDEX TỐI ƯU HÓA TRUY VẤN
 -- =========================================================
@@ -262,6 +465,7 @@ CREATE INDEX idx_orders_user_status ON orders(user_id, status);
 CREATE INDEX idx_order_details_order ON order_details(order_id);
 CREATE INDEX idx_shipment_order ON shipment(order_id);
 CREATE INDEX idx_payment_order ON payment(order_id);
+CREATE INDEX idx_cart_user ON cart_items(user_id);
 
 -- =========================================================
 -- 3. NẠP DỮ LIỆU MẪU
@@ -336,9 +540,30 @@ INSERT INTO orders (order_id, user_id, order_date, total_amount, discount_amount
 (1, 1, NOW(), 300000, 30000, 270000, 'Da giao', 'Cau Giay, Ha Noi'),
 (2, 3, NOW(), 320000, 0, 320000, 'Cho xac nhan', 'Ha Dong, Ha Noi');
 
-INSERT INTO order_details (order_detail_id, order_id, vari_id, quantity, unit_price, subtotal) VALUES
-(1, 1, 1, 2, 150000, 300000),
-(2, 2, 3, 1, 320000, 320000);
+INSERT INTO order_details
+(order_detail_id, order_id, vari_id, quantity, unit_price, subtotal, commission_rate, commission_amount, seller_amount) VALUES
+(1, 1, 1, 2, 150000, 300000, 5.00, 13500, 256500),
+(2, 2, 3, 1, 320000, 320000, 5.00, 16000, 304000);
+
+INSERT INTO commission_records
+(order_detail_id, seller_id, order_id, commission_base, commission_rate, commission_amount, seller_amount)
+SELECT od.order_detail_id, p.seller_id, od.order_id,
+       od.commission_amount + od.seller_amount, od.commission_rate,
+       od.commission_amount, od.seller_amount
+FROM order_details od
+JOIN product_vari v ON v.vari_id=od.vari_id
+JOIN products p ON p.product_id=v.product_id
+JOIN orders o ON o.order_id=od.order_id
+WHERE o.status='Da giao';
+
+INSERT INTO seller_wallet (seller_id, balance)
+SELECT seller_id, SUM(seller_amount)
+FROM commission_records GROUP BY seller_id;
+
+INSERT INTO wallet_transactions (seller_id, order_detail_id, transaction_type, amount, note)
+SELECT seller_id, order_detail_id, 'Cong doanh thu', seller_amount,
+       CONCAT('Doanh thu đơn hàng #', order_id, ' sau khi trừ hoa hồng')
+FROM commission_records;
 
 INSERT INTO payment (payment_id, order_id, payment_method, amount, payment_status, transaction_code, paid_at) VALUES
 (1, 1, 'COD', 270000, 'Da thanh toan', 'COD-DEMO-0001', NOW()),
