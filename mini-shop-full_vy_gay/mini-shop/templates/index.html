@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "macros.html" import wish_btn %}
+{% block title %}Mini Shop - Mua sắm từ nhiều shop{% endblock %}
+{% block content %}
+{% set filtering = kw or cat_id or brand_id %}
+
+{% if not filtering and page == 1 %}
+<section class="hero mb-3" aria-label="Giới thiệu">
+    <div class="hero-main">
+        <h1>Mua sắm từ nhiều shop, giao tận nơi</h1>
+        <p>Chọn phân loại, nhập voucher của shop và đặt hàng trong vài bước.</p>
+        <a href="#products" class="btn btn-sun fw-bold">Xem sản phẩm</a>
+    </div>
+    <div class="hero-side">
+        <a class="hero-tile tile-sun" href="{{ url_for('event_list') }}">
+            <i class="bi bi-lightning-charge-fill"></i>
+            <span><strong>Sự kiện & siêu sale</strong>Khám phá chiến dịch đang diễn ra và ưu đãi sắp mở.</span>
+        </a>
+        <a class="hero-tile tile-teal" href="{{ url_for('seller_channel') }}">
+            <i class="bi bi-shop-window"></i>
+            <span><strong>Mở shop của bạn</strong>Đăng ký người bán, đăng sản phẩm và quản lý kho.</span>
+        </a>
+    </div>
+</section>
+{% endif %}
+
+{% if not filtering and page == 1 %}
+<section class="campaign-section mb-4" aria-label="Sự kiện mua sắm nổi bật">
+    <div class="campaign-heading">
+        <div><span class="eyebrow">ƯU ĐÃI ĐANG CHỜ BẠN</span><h2>Săn sale mỗi ngày</h2><p>Khám phá chiến dịch nổi bật và những ưu đãi có thời hạn.</p></div>
+        <a class="campaign-all" href="{{ url_for('event_list') }}">Tất cả sự kiện <i class="bi bi-arrow-right"></i></a>
+    </div>
+    <div class="campaign-grid">
+        {% for e in home_events %}
+        <a class="campaign-card {% if e.time_status == 'Đang diễn ra' %}campaign-live{% else %}campaign-upcoming{% endif %}" href="{{ url_for('event_detail', event_id=e.event_id) }}">
+            <div class="campaign-art">
+                {% if e.banner_url %}<img src="{{ url_for('static', filename='uploads/' ~ e.banner_url) }}" alt="{{ e.title }}" loading="lazy">
+                {% else %}<div class="campaign-art-placeholder"><span>{{ e.title }}</span><strong>{% if e.time_status == 'Đang diễn ra' %}SALE ĐANG DIỄN RA{% else %}SẮP DIỄN RA{% endif %}</strong><i class="bi bi-stars"></i></div>{% endif %}
+                <span class="campaign-state">{% if e.time_status == 'Đang diễn ra' %}<i class="bi bi-lightning-charge-fill"></i> Đang diễn ra{% else %}<i class="bi bi-calendar-event"></i> Sắp diễn ra{% endif %}</span>
+            </div>
+            <div class="campaign-info"><div><h3>{{ e.title }}</h3><p>{{ e.description or 'Khám phá các sản phẩm ưu đãi trong chương trình.' }}</p></div><span class="campaign-count"><strong>{% if e.product_count %}{{ e.product_count }}{% else %}Mở{% endif %}</strong><small>{% if e.product_count %}sản phẩm{% else %}đăng ký{% endif %}</small></span></div>
+            <div class="campaign-date"><i class="bi bi-clock"></i> {{ e.start_at.strftime('%d/%m/%Y %H:%M') }} – {{ e.end_at.strftime('%d/%m/%Y %H:%M') }}</div>
+        </a>
+        {% else %}
+        <div class="campaign-empty"><i class="bi bi-calendar2-heart"></i><div><strong>Chiến dịch mới sắp xuất hiện!</strong><p>Mini Shop sẽ cập nhật các chương trình 10/10, 11/11, Black Friday và ưu đãi theo mùa tại đây.</p></div><a href="{{ url_for('event_list') }}">Xem sự kiện</a></div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section class="panel mb-3" aria-label="Danh mục sản phẩm">
+    <div class="panel-title">Danh mục</div>
+    <div class="cat-grid">
+        <a class="cat-tile {% if not cat_id %}active{% endif %}" href="{{ url_for('index') }}">
+            <span class="cat-icon c0"><i class="bi bi-grid-fill"></i></span>
+            <span class="cat-name">Tất cả</span>
+        </a>
+        {% for c in categories %}
+        <a class="cat-tile {% if cat_id == c.categories_id %}active{% endif %}" href="{{ url_for('index', cat=c.categories_id) }}">
+            <span class="cat-icon c{{ loop.index % 6 }}">{{ c.categories_name[:1]|upper }}</span>
+            <span class="cat-name">{{ c.categories_name }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+
+<section id="products" class="panel" aria-label="Danh sách sản phẩm">
+    <div class="panel-title d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>{% if filtering %}Kết quả: {{ total }} sản phẩm{% else %}Gợi ý cho bạn{% endif %}</span>
+        <form method="GET" action="{{ url_for('index') }}" class="d-flex gap-2 flex-wrap">
+            {% if kw %}<input type="hidden" name="kw" value="{{ kw }}">{% endif %}
+            {% if cat_id %}<input type="hidden" name="cat" value="{{ cat_id }}">{% endif %}
+            <select name="brand" class="form-select form-select-sm brand-filter" aria-label="Lọc theo thương hiệu" data-autosubmit>
+                <option value="">Mọi thương hiệu</option>
+                {% for b in brands %}
+                <option value="{{ b.brand_id }}" {% if brand_id == b.brand_id %}selected{% endif %}>{{ b.brand_name }}</option>
+                {% endfor %}
+            </select>
+            <select name="sort" class="form-select form-select-sm brand-filter" aria-label="Sắp xếp" data-autosubmit>
+                <option value="new" {% if sort == 'new' %}selected{% endif %}>Mới nhất</option>
+                <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Giá tăng dần</option>
+                <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Giá giảm dần</option>
+                <option value="rating" {% if sort == 'rating' %}selected{% endif %}>Đánh giá cao</option>
+            </select>
+        </form>
+    </div>
+
+    {% if products %}
+    <div class="product-grid">
+        {% for p in products %}
+        {% set soldout = (p.stock or 0) <= 0 %}
+        <article class="product-card {% if soldout %}is-soldout{% endif %}">
+            <a href="{{ url_for('product_detail', product_id=p.product_id) }}" class="product-media" tabindex="-1" aria-hidden="true">
+                {% if p.image_url %}
+                    <img src="{{ url_for('static', filename='uploads/' ~ p.image_url) }}" alt="" loading="lazy">
+                {% else %}
+                    <span class="placeholder-icon"><i class="bi bi-image"></i></span>
+                {% endif %}
+                {% if soldout %}<span class="soldout-mask">Hết hàng</span>{% endif %}
+            </a>
+            {{ wish_btn(p.product_id, p.product_id in wished, 'card-wish') }}
+            <div class="product-body">
+                <h2 class="product-name line-clamp-2">
+                    <a href="{{ url_for('product_detail', product_id=p.product_id) }}" class="stretched-link">{{ p.product_name }}</a>
+                </h2>
+                <div class="product-meta"><i class="bi bi-shop me-1"></i>{{ p.shop_name }}{% if p.avg_star %} · <i class="bi bi-star-fill text-warning"></i> {{ "%.1f"|format(p.avg_star) }}{% endif %}</div>
+                <div class="product-foot">
+                    <span class="price">{% if p.event_discount_percent %}<span class="badge bg-danger me-1">-{{ p.event_discount_percent|int }}%</span>{% endif %}{% if p.min_price != p.max_price %}<small>từ </small>{% endif %}<span class="cur">₫</span>{{ "{:,.0f}".format(p.min_price)|replace(',', '.') }}</span>
+                    {% if p.event_discount_percent %}<small class="text-muted text-decoration-line-through">Giá gốc từ {{ p.original_min_price|vnd }}</small>{% endif %}
+                    <span class="tag-cat">{{ p.categories_name }}</span>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+
+    {% if pages > 1 %}
+    <nav class="p-3 border-top" aria-label="Phân trang">
+        <ul class="pagination pagination-sm justify-content-center mb-0">
+            <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('index', page=page-1, **args) }}#products" aria-label="Trang trước">&laquo;</a>
+            </li>
+            {% for n in range(1, pages + 1) %}
+                {% if n == 1 or n == pages or (n - page)|abs <= 2 %}
+                <li class="page-item {% if n == page %}active{% endif %}"><a class="page-link" href="{{ url_for('index', page=n, **args) }}#products">{{ n }}</a></li>
+                {% elif (n - page)|abs == 3 %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if page >= pages %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('index', page=page+1, **args) }}#products" aria-label="Trang sau">&raquo;</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+    {% else %}
+    <div class="text-center py-5 px-3">
+        <i class="bi bi-inbox fs-1 text-muted"></i>
+        <p class="mt-2 mb-1 fw-semibold">Chưa có sản phẩm nào khớp.</p>
+        <p class="text-muted">Thử đổi từ khóa hoặc bỏ bớt bộ lọc.</p>
+        {% if filtering %}<a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Xem tất cả sản phẩm</a>{% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

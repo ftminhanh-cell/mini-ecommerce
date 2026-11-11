@@ -1,0 +1,49 @@
+{# Hiển thị trạng thái đơn hàng bằng tiếng Việt có dấu, mỗi trạng thái một màu. #}
+{% macro status_badge(status) -%}
+{%- set labels = {
+    'Cho xac nhan': ('Chờ xác nhận', 'warning text-dark'),
+    'Da xac nhan': ('Đã xác nhận', 'info text-dark'),
+    'Dang giao': ('Đang giao', 'primary'),
+    'Da giao': ('Đã giao', 'success'),
+    'Da huy': ('Đã hủy', 'danger')
+} -%}
+{%- set item = labels.get(status, (status, 'secondary')) -%}
+<span class="badge bg-{{ item[1] }}">{{ item[0] }}</span>
+{%- endmacro %}
+
+{% macro status_label(status) -%}
+{{ {'Cho xac nhan': 'Chờ xác nhận', 'Da xac nhan': 'Đã xác nhận', 'Dang giao': 'Đang giao', 'Da giao': 'Đã giao', 'Da huy': 'Đã hủy'}.get(status, status) }}
+{%- endmacro %}
+
+{% macro pay_badge(status) -%}
+{%- set labels = {
+    'Cho thanh toan': ('Chờ thanh toán', 'warning text-dark'),
+    'Da thanh toan': ('Đã thanh toán', 'success'),
+    'Da huy': ('Đã hủy', 'danger')
+} -%}
+{%- set item = labels.get(status, (status, 'secondary')) -%}
+<span class="badge bg-{{ item[1] }}">{{ item[0] }}</span>
+{%- endmacro %}
+
+{# Dãy sao đánh giá #}
+{% macro stars(value) -%}
+{%- set v = (value or 0)|round|int -%}
+<span class="text-warning">{% for i in range(v) %}<i class="bi bi-star-fill"></i>{% endfor %}{% for i in range(5 - v) %}<i class="bi bi-star"></i>{% endfor %}</span>
+{%- endmacro %}
+
+{# Nút trái tim yêu thích (form POST) #}
+{% macro wish_btn(product_id, active, cls='') -%}
+{% if session.user and session.user.role != 'admin' %}
+<form action="{{ url_for('wishlist_toggle', product_id=product_id) }}" method="POST" class="d-inline {{ cls }}">
+    <button type="submit" class="btn-wish {% if active %}is-on{% endif %}" data-no-loading aria-label="{{ 'Bỏ yêu thích' if active else 'Thêm vào yêu thích' }}" title="{{ 'Bỏ yêu thích' if active else 'Yêu thích' }}">
+        <i class="bi {{ 'bi-heart-fill' if active else 'bi-heart' }}"></i>
+    </button>
+</form>
+{% endif %}
+{%- endmacro %}
+
+{# Ảnh sản phẩm nhỏ dùng trong bảng #}
+{% macro thumb(image_url, size=48) -%}
+{% if image_url %}<img src="{{ url_for('static', filename='uploads/' ~ image_url) }}" width="{{ size }}" height="{{ size }}" class="rounded border object-fit-cover" alt="" loading="lazy">
+{% else %}<span class="d-inline-grid bg-light rounded border text-muted text-center" style="width:{{ size }}px;height:{{ size }}px;line-height:{{ size }}px"><i class="bi bi-image"></i></span>{% endif %}
+{%- endmacro %}

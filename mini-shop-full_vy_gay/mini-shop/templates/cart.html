@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Giỏ hàng - Mini Shop{% endblock %}
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-cart3 me-2"></i>Giỏ hàng của tôi</h3>
+
+{% if not items %}
+<div class="panel text-center py-5 px-3">
+    <i class="bi bi-cart-x fs-1 text-muted"></i>
+    <p class="mt-2 mb-1 fw-semibold">Giỏ hàng đang trống.</p>
+    <p class="text-muted">Chọn sản phẩm bạn thích rồi bấm "Thêm vào giỏ".</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Tiếp tục mua sắm</a>
+</div>
+{% else %}
+<div class="row g-3">
+    <div class="col-lg-8">
+        {% for shop, rows in items|groupby('shop_name') %}
+        <div class="panel mb-3">
+            <div class="panel-title"><i class="bi bi-shop me-1"></i>{{ shop }}</div>
+            {% for i in rows %}
+            {% set out = i.stock <= 0 %}
+            <div class="cart-row {% if out %}is-soldout{% endif %}">
+                <input class="form-check-input cart-check" type="checkbox" name="selected" value="{{ i.cart_item_id }}" form="checkout-form"
+                       data-cart-select data-shop="{{ i.seller_id }}" data-amount="{{ (i.price * i.quantity)|int }}" {% if out %}disabled{% else %}checked{% endif %}
+                       aria-label="Chọn {{ i.product_name }}">
+                <a href="{{ url_for('product_detail', product_id=i.product_id) }}">
+                    {% if i.image_url %}<img src="{{ url_for('static', filename='uploads/' ~ i.image_url) }}" class="cart-img" alt="" loading="lazy">
+                    {% else %}<span class="cart-img cart-img-empty"><i class="bi bi-image"></i></span>{% endif %}
+                </a>
+                <div class="cart-info">
+                    <a href="{{ url_for('product_detail', product_id=i.product_id) }}" class="fw-semibold text-reset text-decoration-none line-clamp-2">{{ i.product_name }}</a>
+                    <small class="text-muted">Size: {{ i.size or '-' }} | Màu: {{ i.color or '-' }}</small>
+                    {% if out %}<small class="text-danger fw-semibold">Hết hàng</small>
+                    {% elif i.stock <= 5 %}<small class="stock-low">Chỉ còn {{ i.stock }} sản phẩm</small>{% endif %}
+                </div>
+                <div class="cart-price">{{ i.price|vnd }}</div>
+                <form action="{{ url_for('cart_update') }}" method="POST" class="cart-qty">
+                    <input type="hidden" name="cart_item_id" value="{{ i.cart_item_id }}">
+                    <input type="number" name="quantity" value="{{ i.quantity }}" min="0" max="{{ [i.stock, 1]|max }}" class="form-control form-control-sm"
+                           data-autosubmit-input aria-label="Số lượng" {% if out %}disabled{% endif %}>
+                </form>
+                <div class="cart-line fw-bold text-danger">{{ (i.price * i.quantity)|vnd }}</div>
+                <form action="{{ url_for('cart_remove', item_id=i.cart_item_id) }}" method="POST">
+                    <button type="submit" class="btn btn-sm btn-link text-muted p-1" data-no-loading aria-label="Xóa khỏi giỏ"><i class="bi bi-trash"></i></button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="col-lg-4">
+        <form id="checkout-form" action="{{ url_for('cart_checkout') }}" method="POST" class="panel p-3 order-box sticky-lg-top" style="top:5rem" data-cart-form data-rate="{{ me.rate|int if me.rate else 0 }}">
+            <h5 class="fw-bold mb-3">Thanh toán</h5>
+            <div class="mb-3">
+                <label class="form-label" for="address">Địa chỉ nhận hàng</label>
+                <input type="text" id="address" name="address" class="form-control" value="{{ me.address or '' }}" required autocomplete="street-address">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="shipping_method_id">Đơn vị vận chuyển <small class="text-muted">(mỗi shop một đơn)</small></label>
+                <select name="shipping_method_id" id="shipping_method_id" class="form-select" required data-ship>
+                    {% for sm in shipping_methods %}
+                    <option value="{{ sm.shipping_method_id }}" data-cost="{{ sm.base_cost|int }}">{{ sm.provider_name }} ({{ sm.base_cost|vnd }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="payment_method">Thanh toán</label>
+                <select name="payment_method" id="payment_method" class="form-select" required>
+                    {% for k, label in payment_methods.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}
+                </select>
+                <small class="text-muted d-block mt-1">DEMO chỉ mô phỏng. VNPay/MoMo yêu cầu cấu hình tài khoản cổng thanh toán và URL HTTPS công khai.</small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="promo_code">Mã voucher của shop (nếu có)</label>
+                <input type="text" id="promo_code" name="promo_code" class="form-control text-uppercase" autocomplete="off" placeholder="Nhập mã voucher">
+            </div>
+
+            <div class="price-summary mb-3">
+                <div class="d-flex justify-content-between"><span>Tạm tính (<span data-out="cart-count">0</span> món)</span><span data-out="cart-sub">0 đ</span></div>
+                {% if me.rate %}<div class="d-flex justify-content-between text-success"><span>Hạng {{ me.rank_name }} (-{{ me.rate|int }}%)</span><span data-out="cart-rank">0 đ</span></div>{% endif %}
+                <div class="d-flex justify-content-between"><span>Phí vận chuyển (<span data-out="cart-shops">0</span> shop)</span><span data-out="cart-ship">0 đ</span></div>
+                <div class="total d-flex justify-content-between"><span>Ước tính</span><strong data-out="cart-total">0 đ</strong></div>
+                <small class="text-muted d-block mt-1">Voucher được trừ khi đặt hàng. Số tiền cuối cùng hiện ở đơn hàng.</small>
+            </div>
+            <button type="submit" class="btn btn-buy btn-lg w-100 fw-bold"><i class="bi bi-bag-check-fill me-2"></i>Đặt hàng</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

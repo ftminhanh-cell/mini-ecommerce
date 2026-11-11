@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% from "macros.html" import wish_btn %}
+{% block title %}{{ product.product_name }} - Mini Shop{% endblock %}
+{% block content %}
+{% set available = variants|selectattr('quantity', 'gt', 0)|list %}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0 small">
+        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Sản phẩm</a></li>
+        <li class="breadcrumb-item">{{ product.categories_name }}</li>
+        <li class="breadcrumb-item active" aria-current="page">{{ product.product_name }}</li>
+    </ol>
+</nav>
+
+<div class="card p-4 shadow-sm border-0 rounded-4 mb-4">
+    <div class="row g-4">
+        <div class="col-md-5 text-center">
+            {% if product.image_url %}
+                <img src="{{ url_for('static', filename='uploads/' ~ product.image_url) }}" alt="{{ product.product_name }}" class="img-fluid rounded-3 shadow-sm detail-media">
+            {% else %}
+                <div class="bg-light rounded-3 d-flex align-items-center justify-content-center text-muted detail-media-empty"><i class="bi bi-image fs-1"></i></div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-7">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+                <h2 class="fw-bold">{{ product.product_name }}</h2>
+                {{ wish_btn(product.product_id, in_wishlist, 'detail-wish') }}
+            </div>
+            <div class="mb-2">
+                <span class="badge bg-info text-dark"><i class="bi bi-shop me-1"></i>{{ product.shop_name }}</span>
+                <span class="badge bg-secondary">{{ product.categories_name }}</span>
+                {% if product.brand_name %}<span class="badge bg-primary">{{ product.brand_name }}</span>{% endif %}
+            </div>
+
+            {% if star_stats.count_star %}
+                <p class="text-warning mb-2">
+                    <i class="bi bi-star-fill"></i>
+                    <strong>{{ "{:.1f}".format(star_stats.avg_star) }}</strong> / 5.0
+                    <span class="text-muted">({{ star_stats.count_star }} lượt đánh giá)</span>
+                </p>
+            {% endif %}
+
+            <p class="text-muted mt-2">{{ product.description or 'Người bán chưa thêm mô tả.' }}</p>
+
+            {% if promotions %}
+            <div class="alert alert-warning py-2 mb-3">
+                <div class="mb-1"><i class="bi bi-ticket-perforated-fill me-1"></i><strong>Voucher đang áp dụng</strong> (bấm để dùng):</div>
+                {% for pr in promotions %}
+                    <button type="button" class="promo-chip me-1" data-fill-promo="{{ pr.code }}">
+                        {{ pr.code }}
+                        {% if pr.discount_percent %}-{{ pr.discount_percent|int }}%{% else %}-{{ "{:,.0f}".format(pr.discount_amount)|replace(',', '.') }} đ{% endif %}
+                    </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form action="{{ url_for('place_order') }}" method="POST" class="order-box p-3 mt-3" data-order-form>
+                <div class="mb-3">
+                    <label class="form-label" for="vari_id">Phân loại</label>
+                    <select name="vari_id" id="vari_id" class="form-select" required {% if not available %}disabled{% endif %}>
+                        {% for v in variants %}
+                        <option value="{{ v.vari_id }}"
+                                data-price="{{ v.sale_price|int }}"
+                                data-stock="{{ v.quantity }}"
+                                {% if v.quantity <= 0 %}disabled{% endif %}
+                                {% if available and v.vari_id == available[0].vari_id %}selected{% endif %}>
+                            Size: {{ v.size or '-' }} | Màu: {{ v.color or '-' }} | {{ "{:,.0f}".format(v.sale_price)|replace(',', '.') }} đ{% if v.quantity <= 0 %} (hết hàng){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="quantity">Số lượng</label>
+                        <input type="number" id="quantity" name="quantity" class="form-control" value="1" min="1" required>
+                        <div class="form-text" data-out="stock"></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="promo_code">Mã voucher (nếu có)</label>
+                        <input type="text" id="promo_code" name="promo_code" class="form-control text-uppercase" placeholder="Nhập mã voucher" autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="shipping_method_id">Đơn vị vận chuyển</label>
+                        <select name="shipping_method_id" id="shipping_method_id" class="form-select" required>
+                            {% for sm in shipping_methods %}
+                            <option value="{{ sm.shipping_method_id }}" data-cost="{{ sm.base_cost|int }}">{{ sm.provider_name }} ({{ "{:,.0f}".format(sm.base_cost)|replace(',', '.') }} đ)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="payment_method">Thanh toán</label>
+                        <select name="payment_method" id="payment_method" class="form-select" required>
+                            {% for key, label in payment_methods.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="address">Địa chỉ nhận hàng</label>
+                    <input type="text" id="address" name="address" class="form-control" value="{{ default_address }}" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành" required autocomplete="street-address">
+                </div>
+
+                <div class="price-summary mb-3" aria-live="polite">
+                    <div class="d-flex justify-content-between"><span>Đơn giá</span><span data-out="price">-</span></div>
+                    <div class="d-flex justify-content-between"><span>Phí vận chuyển</span><span data-out="ship">-</span></div>
+                    <div class="total d-flex justify-content-between"><span>Tạm tính</span><strong data-out="total">-</strong></div>
+                    <small class="text-muted d-block mt-1">Chưa trừ voucher và ưu đãi hạng thành viên. Số tiền cuối cùng hiện ở đơn hàng.</small>
+                </div>
+
+                {% if not session.user %}
+                    <a href="{{ url_for('login') }}" class="btn btn-buy btn-lg w-100 fw-bold"><i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập để đặt mua</a>
+                {% elif session.user.role == 'admin' %}
+                    <div class="alert alert-secondary mb-0">Tài khoản quản trị không thể đặt hàng.</div>
+                {% elif not available %}
+                    <button type="button" class="btn btn-secondary btn-lg w-100" disabled>Sản phẩm đã hết hàng</button>
+                {% elif product.seller_user == session.user.id %}
+                    <div class="alert alert-secondary mb-0">Đây là sản phẩm của shop bạn.</div>
+                {% else %}
+                    <div class="row g-2">
+                        <div class="col-sm-5">
+                            <button type="submit" formaction="{{ url_for('cart_add') }}" formnovalidate class="btn btn-outline-primary btn-lg w-100 fw-bold"><i class="bi bi-cart-plus me-1"></i>Thêm vào giỏ</button>
+                        </div>
+                        <div class="col-sm-7">
+                            <button type="submit" class="btn btn-buy btn-lg w-100 fw-bold"><i class="bi bi-lightning-charge-fill me-1"></i>Mua ngay</button>
+                        </div>
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+
+<h4 class="fw-bold mt-4 mb-3"><i class="bi bi-chat-left-text me-2"></i>Đánh giá từ người mua</h4>
+<div class="list-group shadow-sm">
+    {% for r in reviews %}
+    <div class="list-group-item">
+        <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1 fw-bold">
+                {{ r.full_name }}
+                <span class="text-warning ms-1" aria-label="{{ r.rating }} trên 5 sao">
+                    {% for i in range(r.rating) %}<i class="bi bi-star-fill"></i>{% endfor %}{% for i in range(5 - r.rating) %}<i class="bi bi-star"></i>{% endfor %}
+                </span>
+            </h6>
+            <small class="text-muted">{{ r.created_at.strftime('%d/%m/%Y') }}</small>
+        </div>
+        <p class="mb-1 text-secondary">{{ r.comment or 'Người mua không để lại nhận xét.' }}</p>
+    </div>
+    {% else %}
+    <div class="list-group-item text-muted">Chưa có đánh giá nào. Đánh giá sẽ xuất hiện sau khi có người nhận hàng.</div>
+    {% endfor %}
+</div>
+
+{% if related %}
+<h4 class="fw-bold mt-4 mb-3"><i class="bi bi-grid me-2"></i>Sản phẩm cùng danh mục</h4>
+<div class="product-grid related-grid rounded-3">
+    {% for p in related %}
+    <article class="product-card">
+        <a href="{{ url_for('product_detail', product_id=p.product_id) }}" class="product-media" tabindex="-1" aria-hidden="true">
+            {% if p.image_url %}<img src="{{ url_for('static', filename='uploads/' ~ p.image_url) }}" alt="" loading="lazy">
+            {% else %}<span class="placeholder-icon"><i class="bi bi-image"></i></span>{% endif %}
+        </a>
+        <div class="product-body">
+            <h2 class="product-name line-clamp-2"><a href="{{ url_for('product_detail', product_id=p.product_id) }}" class="stretched-link">{{ p.product_name }}</a></h2>
+            <div class="product-foot"><span class="price"><span class="cur">₫</span>{{ "{:,.0f}".format(p.min_price)|replace(',', '.') }}</span></div>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

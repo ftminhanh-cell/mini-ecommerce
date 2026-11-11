@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% from "macros.html" import status_badge, pay_badge %}
+{% block title %}Đơn hàng #{{ order.order_id }} - Mini Shop{% endblock %}
+{% block content %}
+{% set steps = [('Cho xac nhan', 'Chờ xác nhận', 'bi-hourglass-split'), ('Da xac nhan', 'Đã xác nhận', 'bi-check2-circle'), ('Dang giao', 'Đang giao', 'bi-truck'), ('Da giao', 'Đã giao', 'bi-box-seam')] %}
+{% set cur_idx = {'Cho xac nhan': 0, 'Da xac nhan': 1, 'Dang giao': 2, 'Da giao': 3}.get(order.status, -1) %}
+{% if viewer == 'admin' %}{% set back_url = url_for('admin_panel') %}{% elif viewer == 'seller' %}{% set back_url = url_for('seller_channel') %}{% else %}{% set back_url = url_for('my_orders') %}{% endif %}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0 small">
+        <li class="breadcrumb-item"><a href="{{ back_url }}">{{ 'Quản trị' if viewer == 'admin' else ('Kênh người bán' if viewer == 'seller' else 'Đơn hàng của tôi') }}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Đơn #{{ order.order_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h3 class="fw-bold mb-0">Đơn hàng #{{ order.order_id }}</h3>
+    <div>{{ status_badge(order.status) }}</div>
+</div>
+
+{% if cur_idx >= 0 %}
+<div class="panel p-3 mb-3">
+    <ol class="order-steps">
+        {% for key, label, icon in steps %}
+        <li class="{% if loop.index0 < cur_idx %}is-done{% elif loop.index0 == cur_idx %}is-current{% endif %}">
+            <span class="step-dot"><i class="bi {{ icon }}"></i></span>
+            <span class="step-label">{{ label }}</span>
+        </li>
+        {% endfor %}
+    </ol>
+</div>
+{% else %}
+<div class="alert alert-danger"><i class="bi bi-x-octagon me-1"></i>Đơn hàng này đã bị hủy.</div>
+{% endif %}
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="panel">
+            <div class="panel-title">Sản phẩm</div>
+            {% for it in items %}
+            <div class="order-item">
+                <a href="{{ url_for('product_detail', product_id=it.product_id) }}">
+                    {% if it.image_url %}<img src="{{ url_for('static', filename='uploads/' ~ it.image_url) }}" class="cart-img" alt="" loading="lazy">
+                    {% else %}<span class="cart-img cart-img-empty"><i class="bi bi-image"></i></span>{% endif %}
+                </a>
+                <div class="flex-grow-1 min-w-0">
+                    <a href="{{ url_for('product_detail', product_id=it.product_id) }}" class="fw-semibold text-reset text-decoration-none">{{ it.product_name }}</a>
+                    <div><small class="text-muted">SKU: {{ it.sku }} | Size: {{ it.size or '-' }} | Màu: {{ it.color or '-' }}</small></div>
+                    <div><small class="text-muted"><i class="bi bi-shop"></i> {{ it.shop_name }}</small></div>
+                </div>
+                <div class="text-end">
+                    <div>{{ it.unit_price|vnd }} × {{ it.quantity }}</div>
+                    <div class="fw-bold">{{ it.subtotal|vnd }}</div>
+                    {% if viewer == 'buyer' and order.status == 'Da giao' %}
+                        {% if it.review_id %}<small class="text-success"><i class="bi bi-check-circle"></i> Đã đánh giá</small>
+                        {% else %}<a href="{{ url_for('my_orders', status='Da giao') }}" class="small">Đánh giá</a>{% endif %}
+                    {% endif %}
+                    {% if viewer == 'buyer' and order.status == 'Da giao' %}
+                    <button type="button" class="btn btn-sm btn-outline-warning mt-1" data-bs-toggle="modal" data-bs-target="#returnModal{{ it.order_detail_id }}">Yêu cầu đổi trả</button>
+                    <div class="modal fade" id="returnModal{{ it.order_detail_id }}" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><form class="modal-content" method="POST" action="{{ url_for('request_return') }}">
+                        <div class="modal-header"><h5 class="modal-title">Yêu cầu đổi trả</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body"><input type="hidden" name="order_detail_id" value="{{ it.order_detail_id }}"><label class="form-label">Số lượng</label><input class="form-control mb-2" type="number" name="quantity" min="1" max="{{ it.quantity }}" value="1" required><label class="form-label">Lý do (ít nhất 10 ký tự)</label><textarea class="form-control" name="reason" minlength="10" maxlength="500" required></textarea></div>
+                        <div class="modal-footer"><button class="btn btn-warning" type="submit">Gửi yêu cầu</button></div>
+                    </form></div></div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            <div class="p-3 border-top">
+                <div class="d-flex justify-content-between"><span class="text-muted">Tạm tính</span><span>{{ order.total_amount|vnd }}</span></div>
+                <div class="d-flex justify-content-between"><span class="text-muted">Giảm giá (voucher + hạng)</span><span class="text-success">- {{ order.discount_amount|vnd }}</span></div>
+                {% if shipment %}<div class="d-flex justify-content-between"><span class="text-muted">Phí vận chuyển</span><span>{{ shipment.base_cost|vnd }}</span></div>{% endif %}
+                <div class="d-flex justify-content-between fs-5 fw-bold mt-1"><span>Tổng thanh toán</span><span class="text-danger">{{ order.final_amount|vnd }}</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="panel mb-3">
+            <div class="panel-title">Thông tin nhận hàng</div>
+            <div class="p-3">
+                {% if viewer != 'buyer' %}<div class="fw-semibold">{{ customer.full_name }}</div>
+                <div class="small text-muted"><i class="bi bi-telephone"></i> {{ customer.phone or 'Chưa có SĐT' }}</div>{% endif %}
+                <div class="small"><i class="bi bi-geo-alt"></i> {{ order.shipping_address }}</div>
+                <div class="small text-muted mt-1"><i class="bi bi-calendar3"></i> Đặt lúc {{ order.order_date.strftime('%d/%m/%Y %H:%M') }}</div>
+            </div>
+        </div>
+        {% if payment %}
+        <div class="panel mb-3">
+            <div class="panel-title">Thanh toán</div>
+            <div class="p-3">
+                <div class="d-flex justify-content-between"><span class="text-muted">Phương thức</span><span>{{ {'COD':'Khi nhận hàng (COD)','DEMO':'Thanh toán mô phỏng (DEMO)','VNPAY':'VNPay','MOMO':'MoMo','BANK_QR':'Chuyển khoản VietQR'}.get(payment.payment_method, payment.payment_method) }}</span></div>
+                <div class="d-flex justify-content-between"><span class="text-muted">Trạng thái</span>{{ pay_badge(payment.payment_status) }}</div>
+                {% if payment.paid_at %}<div class="d-flex justify-content-between"><span class="text-muted">Thanh toán lúc</span><span>{{ payment.paid_at.strftime('%d/%m/%Y %H:%M') }}</span></div>{% endif %}
+                {% if payment.transaction_code %}<div class="small text-muted mt-1">Mã giao dịch: {{ payment.transaction_code }}</div>{% endif %}
+                {% if viewer == 'buyer' and payment.payment_method in ['DEMO','VNPAY','MOMO','BANK_QR'] and payment.payment_method != 'BANK_QR' and payment.payment_status != 'Da thanh toan' and order.status != 'Da huy' %}
+                <form action="{{ url_for('payment_start', order_id=order.order_id) }}" method="POST" class="mt-3">
+                    <button class="btn btn-primary w-100" type="submit"><i class="bi bi-credit-card me-1"></i>{% if payment.payment_method == 'DEMO' %}Mô phỏng thanh toán{% else %}Thanh toán ngay{% endif %}</button>
+                </form>
+                {% endif %}
+                {% if viewer == 'buyer' and payment.payment_method == 'BANK_QR' and payment.payment_status != 'Da thanh toan' and order.status != 'Da huy' %}
+                    <div class="mt-3 border rounded-3 p-3 text-center">
+                        <div class="fw-bold mb-2">Quét mã QR để chuyển khoản</div>
+                        {% if bank_qr_url %}<img src="{{ bank_qr_url }}" alt="VietQR đơn hàng {{ order.order_id }}" class="img-fluid" style="max-width:260px">{% else %}<div class="alert alert-warning small">Shop chưa cấu hình tài khoản nhận tiền. Vui lòng liên hệ quản trị viên.</div>{% endif %}
+                        <div class="small text-start mt-2">
+                            <div>Ngân hàng: <strong>{{ bank_name or 'Chưa cấu hình' }}</strong></div>
+                            <div>Số tài khoản: <strong>{{ bank_account_no or 'Chưa cấu hình' }}</strong></div>
+                            <div>Chủ tài khoản: <strong>{{ bank_account_name or 'Chưa cấu hình' }}</strong></div>
+                            <div>Số tiền: <strong class="text-danger">{{ payment.amount|vnd }}</strong></div>
+                            <div>Nội dung: <strong>MINISHOP{{ order.order_id }}</strong></div>
+                        </div>
+                        <div class="alert alert-info small text-start mt-2 mb-0">Hệ thống tự xác nhận khi nhận webhook đối soát ngân hàng. Không chuyển khoản với nội dung khác.</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% if shipment %}
+        <div class="panel">
+            <div class="panel-title">Vận chuyển</div>
+            <div class="p-3">
+                <div class="d-flex justify-content-between"><span class="text-muted">Đơn vị</span><span>{{ shipment.provider_name }}</span></div>
+                <div class="d-flex justify-content-between"><span class="text-muted">Mã vận đơn</span><code>{{ shipment.tracking_code }}</code></div>
+                {% if shipment.shipped_date %}<div class="d-flex justify-content-between"><span class="text-muted">Gửi hàng</span><span>{{ shipment.shipped_date.strftime('%d/%m/%Y') }}</span></div>{% endif %}
+                {% if shipment.delivered_date %}<div class="d-flex justify-content-between"><span class="text-muted">Đã giao</span><span>{{ shipment.delivered_date.strftime('%d/%m/%Y') }}</span></div>{% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if viewer == 'buyer' %}
+        <div class="d-grid gap-2 mt-3">
+            <form action="{{ url_for('reorder', order_id=order.order_id) }}" method="POST" class="d-grid">
+                <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Mua lại đơn này</button>
+            </form>
+            {% if order.status == 'Cho xac nhan' %}
+            <form action="{{ url_for('cancel_order', order_id=order.order_id) }}" method="POST" class="d-grid" data-confirm="Hủy đơn hàng này? Hàng sẽ được hoàn lại vào kho.">
+                <button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Hủy đơn hàng</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

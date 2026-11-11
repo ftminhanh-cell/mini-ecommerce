@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Đăng ký - Mini Shop{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card p-4 shadow-sm border-0">
+            <h3 class="text-center mb-3">Đăng ký tài khoản</h3>
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label" for="username">Tên đăng nhập</label>
+                    <input type="text" id="username" name="username" value="{{ form.get('username', '') }}" class="form-control" required autofocus minlength="3" maxlength="30" autocomplete="username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="password">Mật khẩu</label>
+                    <div class="input-group">
+                        <input type="password" id="password" name="password" class="form-control" required minlength="6" autocomplete="new-password" aria-describedby="password-help">
+                        <button class="btn btn-outline-secondary" type="button" data-toggle-password="#password" aria-label="Hiện mật khẩu" aria-pressed="false"><i class="bi bi-eye"></i></button>
+                    </div>
+                    <div class="form-text" id="password-help">Tối thiểu 6 ký tự.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="full_name">Họ và tên</label>
+                    <input type="text" id="full_name" name="full_name" value="{{ form.get('full_name', '') }}" class="form-control" required autocomplete="name">
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="phone">Số điện thoại</label>
+                        <input type="tel" id="phone" name="phone" value="{{ form.get('phone', '') }}" class="form-control" required inputmode="numeric"
+                               pattern="0[0-9]{9}" title="Số điện thoại gồm 10 chữ số, bắt đầu bằng 0" autocomplete="tel">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{ form.get('email', '') }}" class="form-control" required autocomplete="email">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="address">Địa chỉ</label>
+                    <input type="text" id="address" name="address" value="{{ form.get('address', '') }}" class="form-control" required autocomplete="street-address">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Tạo tài khoản</button>
+            </form>
+            <p class="text-center text-muted small mt-3 mb-0">Đã có tài khoản? <a href="{{ url_for('login') }}">Đăng nhập</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

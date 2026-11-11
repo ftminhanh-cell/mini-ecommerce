@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Thông báo - Mini Shop{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3"><h3 class="fw-bold mb-0">Thông báo</h3><span class="text-muted small">100 thông báo gần nhất</span></div>
+<div class="panel">
+{% for n in notifications %}
+<a class="d-block p-3 border-bottom text-reset text-decoration-none {% if not n.is_read %}bg-light{% endif %}" href="{{ n.target_url or url_for('index') }}"><div class="d-flex justify-content-between gap-2"><strong>{{ n.title }}</strong><small class="text-muted text-nowrap">{{ n.created_at.strftime('%d/%m/%Y %H:%M') }}</small></div><div class="text-muted small mt-1">{{ n.message }}</div></a>
+{% else %}<div class="p-5 text-center text-muted">Bạn chưa có thông báo nào.</div>{% endfor %}
+</div>
+{% endblock %}

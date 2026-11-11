@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "macros.html" import wish_btn %}
+{% block title %}Sản phẩm yêu thích - Mini Shop{% endblock %}
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-heart-fill text-danger me-2"></i>Sản phẩm yêu thích</h3>
+<section class="panel">
+    {% if products %}
+    <div class="product-grid">
+        {% for p in products %}
+        {% set soldout = (p.stock or 0) <= 0 %}
+        <article class="product-card {% if soldout %}is-soldout{% endif %}">
+            <a href="{{ url_for('product_detail', product_id=p.product_id) }}" class="product-media" tabindex="-1" aria-hidden="true">
+                {% if p.image_url %}<img src="{{ url_for('static', filename='uploads/' ~ p.image_url) }}" alt="" loading="lazy">
+                {% else %}<span class="placeholder-icon"><i class="bi bi-image"></i></span>{% endif %}
+                {% if soldout %}<span class="soldout-mask">Hết hàng</span>{% endif %}
+            </a>
+            {{ wish_btn(p.product_id, true, 'card-wish') }}
+            <div class="product-body">
+                <h2 class="product-name line-clamp-2"><a href="{{ url_for('product_detail', product_id=p.product_id) }}" class="stretched-link">{{ p.product_name }}</a></h2>
+                <div class="product-meta"><i class="bi bi-shop me-1"></i>{{ p.shop_name }}</div>
+                <div class="product-foot">
+                    <span class="price">{% if p.min_price != p.max_price %}<small>từ </small>{% endif %}<span class="cur">₫</span>{{ "{:,.0f}".format(p.min_price)|replace(',', '.') }}</span>
+                    <span class="tag-cat">{{ p.categories_name }}</span>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 px-3">
+        <i class="bi bi-heart fs-1 text-muted"></i>
+        <p class="mt-2 mb-1 fw-semibold">Bạn chưa yêu thích sản phẩm nào.</p>
+        <p class="text-muted">Bấm vào biểu tượng trái tim ở sản phẩm để lưu lại xem sau.</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Khám phá sản phẩm</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

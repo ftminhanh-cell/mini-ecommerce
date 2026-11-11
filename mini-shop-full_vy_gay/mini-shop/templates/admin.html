@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% from "macros.html" import status_badge, thumb %}
+{% block title %}Quản trị - Mini Shop
+<div class="card p-3 shadow-sm border-0 mt-3">
+    <h5 class="fw-bold">Yêu cầu đổi trả đã được shop chấp nhận</h5>
+    <p class="small text-muted">Admin kiểm tra hàng và thực hiện hoàn tiền trên ngân hàng/cổng thanh toán trước, sau đó nhập mã giao dịch để ghi sổ. Với hoàn tiền một phần, hệ thống phân bổ ngược phần shop và hoa hồng sàn theo tỷ lệ dòng hàng.</p>
+    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Mã</th><th>Đơn</th><th>Khách</th><th>Shop</th><th>Lý do</th><th>Mã giao dịch hoàn</th></tr></thead><tbody>
+    {% for rr in accepted_returns %}<tr><td>#{{ rr.return_id }}</td><td>#{{ rr.order_id }}</td><td>{{ rr.full_name }}</td><td>{{ rr.shop_name }}</td><td>{{ rr.reason }}</td><td><form class="d-flex gap-2" method="POST" action="{{ url_for('admin_refund_return', return_id=rr.return_id) }}"><input class="form-control form-control-sm" name="refund_reference" required placeholder="Mã giao dịch ngân hàng/cổng"><button class="btn btn-sm btn-warning text-nowrap">Ghi nhận hoàn</button></form></td></tr>
+    {% else %}<tr><td colspan="6" class="text-center text-muted">Không có yêu cầu chờ hoàn tiền.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="card p-3 shadow-sm border-0 mt-3">
+    <h5 class="fw-bold">Hoa hồng riêng theo danh mục và sản phẩm</h5>
+    <p class="small text-muted">Thứ tự ưu tiên: sản phẩm → shop → danh mục → tỷ lệ mặc định. Để trống để kế thừa mức phía sau.</p>
+    <h6 class="fw-semibold">Theo danh mục</h6>
+    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Danh mục</th><th>Tỷ lệ (%)</th><th>Lưu</th></tr></thead><tbody>
+    {% for c in categories %}<tr><td>{{ c.categories_name }}</td><td><form class="d-flex gap-2" method="POST" action="{{ url_for('admin_category_commission', category_id=c.categories_id) }}"><input class="form-control form-control-sm" type="number" name="commission_rate" min="0" max="100" step="0.01" value="{{ c.commission_rate if c.commission_rate is not none else '' }}" placeholder="Kế thừa mặc định"><button class="btn btn-sm btn-primary">Lưu</button></form></td><td></td></tr>{% endfor %}
+    </tbody></table></div>
+    <h6 class="fw-semibold mt-3">Theo shop (100 shop gần nhất)</h6>
+    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Shop</th><th>Hoa hồng (%)</th><th></th></tr></thead><tbody>
+    {% for sh in commission_sellers %}<tr><td>{{ sh.shop_name }}</td><td><form class="d-flex gap-2" method="POST" action="{{ url_for('admin_seller_commission', seller_id=sh.seller_id) }}"><input class="form-control form-control-sm" type="number" name="commission_rate" min="0" max="100" step="0.01" value="{{ sh.commission_rate if sh.commission_rate is not none else '' }}" placeholder="Kế thừa"><button class="btn btn-sm btn-primary">Lưu</button></form></td><td></td></tr>{% endfor %}
+    </tbody></table></div>
+    <h6 class="fw-semibold mt-3">Theo sản phẩm (100 sản phẩm gần nhất)</h6>
+    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Sản phẩm</th><th>Shop</th><th>Hoa hồng (%)</th><th></th></tr></thead><tbody>
+    {% for p in commission_products %}<tr><td>{{ p.product_name }}</td><td>{{ p.shop_name }}</td><td><form class="d-flex gap-2" method="POST" action="{{ url_for('admin_product_commission', product_id=p.product_id) }}"><input class="form-control form-control-sm" type="number" name="commission_rate" min="0" max="100" step="0.01" value="{{ p.commission_rate if p.commission_rate is not none else '' }}" placeholder="Kế thừa"><button class="btn btn-sm btn-primary">Lưu</button></form></td><td></td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-shield-lock-fill text-danger me-2"></i>Panel Quản Trị Viên</h3>
+
+<!-- THỐNG KÊ -->
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg"><div class="stat-tile"><span class="stat-num">{{ stats.users }}</span><span class="stat-label">Khách hàng</span></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile"><span class="stat-num">{{ stats.shops }}</span><span class="stat-label">Shop đang hoạt động</span></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile"><span class="stat-num">{{ stats.products }}</span><span class="stat-label">Sản phẩm đã duyệt</span></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile"><span class="stat-num">{{ stats.orders }}</span><span class="stat-label">Đơn hàng</span></div></div>
+    <div class="col-12 col-lg"><div class="stat-tile"><span class="stat-num text-success">{{ stats.revenue|vnd }}</span><span class="stat-label">Doanh thu (đơn đã giao)</span></div></div>
+</div>
+
+<!-- CẤU HÌNH HOA HỒNG VÀ ĐỐI SOÁT -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="card p-3 shadow-sm border-0 h-100">
+            <h5 class="fw-bold">Cấu hình hoa hồng sàn</h5>
+            <div class="mb-2"><span class="text-muted small">Tổng hoa hồng đã ghi nhận</span><div class="fs-4 fw-bold text-success">{{ commission_stats.total|vnd }}</div></div>
+            <form action="{{ url_for('admin_update_commission') }}" method="POST">
+                <label class="form-label" for="commission_rate">Tỷ lệ hoa hồng mặc định (%)</label>
+                <div class="input-group"><input id="commission_rate" name="commission_rate" type="number" min="0" max="100" step="0.01" value="{{ commission_rate }}" class="form-control" required><span class="input-group-text">%</span></div>
+                <small class="text-muted d-block my-2">Chỉ áp dụng cho đơn hàng mới. Đơn cũ giữ tỷ lệ đã chốt.</small>
+                <button class="btn btn-primary w-100" type="submit">Lưu tỷ lệ</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card p-3 shadow-sm border-0 h-100">
+            <h5 class="fw-bold">Yêu cầu rút tiền chờ duyệt <span class="badge bg-warning text-dark">{{ pending_withdrawals|length }}</span></h5>
+            <div class="table-responsive"><table class="table table-sm align-middle">
+                <thead><tr><th>Shop</th><th>Số tiền</th><th>Thông tin nhận</th><th>Thao tác</th></tr></thead>
+                <tbody>
+                {% for w in pending_withdrawals %}
+                <tr><td>{{ w.shop_name }}</td><td class="fw-bold">{{ w.amount|vnd }}</td><td>{{ w.bank_name }}<br>{{ w.account_name }} · {{ w.account_number }}</td>
+                    <td class="text-nowrap">
+                        <form class="d-inline" method="POST" action="{{ url_for('admin_process_withdrawal', withdrawal_id=w.withdrawal_id, action='approve') }}" data-confirm="Xác nhận đã kiểm tra và sẽ chuyển khoản cho shop?"><button class="btn btn-sm btn-success">Duyệt</button></form>
+                        <form class="d-inline" method="POST" action="{{ url_for('admin_process_withdrawal', withdrawal_id=w.withdrawal_id, action='reject') }}" data-confirm="Từ chối yêu cầu và hoàn tiền vào ví shop?"><button class="btn btn-sm btn-outline-danger">Từ chối</button></form>
+                    </td></tr>
+                {% else %}<tr><td colspan="4" class="text-muted text-center">Không có yêu cầu rút tiền chờ duyệt.</td></tr>{% endfor %}
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+</div>
+
+<!-- QUẢN LÝ TẤT CẢ ĐƠN HÀNG HỆ THỐNG -->
+<div class="card p-3 shadow-sm border-0 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h5 class="fw-bold text-dark mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Quản lý Đơn hàng Toàn Hệ thống</h5>
+        <form method="GET" class="d-flex align-items-center gap-2">
+            <select name="status" class="form-select form-select-sm" aria-label="Lọc trạng thái" data-autosubmit>
+                <option value="">Tất cả ({{ stats.orders }})</option>
+                {% for k, label in [('Cho xac nhan', 'Chờ xác nhận'), ('Da xac nhan', 'Đã xác nhận'), ('Dang giao', 'Đang giao'), ('Da giao', 'Đã giao'), ('Da huy', 'Đã hủy')] %}
+                <option value="{{ k }}" {% if order_status == k %}selected{% endif %}>{{ label }} ({{ by_status.get(k, 0) }})</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr><th>Mã ĐH</th><th>Khách hàng</th><th>Sản phẩm mua</th><th>Shop bán</th><th>Tổng tiền</th><th>Ngày đặt</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody>
+                {% for o in all_orders %}
+                <tr>
+                    <td><a href="{{ url_for('order_detail', order_id=o.order_id) }}" class="fw-bold text-decoration-none">#{{ o.order_id }}</a></td>
+                    <td>
+                        <strong class="text-primary">{{ o.customer_name }}</strong><br>
+                        <small class="text-muted"><i class="bi bi-telephone"></i> {{ o.customer_phone or 'Chưa có SĐT' }}</small><br>
+                        <small class="text-muted"><i class="bi bi-geo-alt"></i> {{ o.shipping_address }}</small>
+                    </td>
+                    <td class="small">{{ o['items'] }}</td>
+                    <td><span class="badge bg-info text-dark">{{ o.shop_name }}</span></td>
+                    <td class="fw-bold text-danger">{{ o.final_amount|vnd }}</td>
+                    <td><small class="text-nowrap">{{ o.order_date.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    <td>{{ status_badge(o.status) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-3">Không có đơn hàng nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- SHOP CHỜ DUYỆT -->
+    <div class="col-md-5">
+        <div class="card p-3 shadow-sm border-0 h-100">
+            <h5 class="fw-bold"><i class="bi bi-shop me-2 text-warning"></i>Hồ sơ Shop chờ duyệt <span class="badge bg-warning text-dark">{{ sellers|length }}</span></h5>
+            <ul class="list-group list-group-flush">
+                {% for s in sellers %}
+                <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                    <div class="min-w-0">
+                        <strong>{{ s.shop_name }}</strong><br>
+                        <small class="text-muted">Chủ: {{ s.full_name }} · MST {{ s.tax_code }} · CCCD {{ s.cccd }}</small>
+                    </div>
+                    <div class="d-flex gap-1 flex-none">
+                        <form action="{{ url_for('approve_seller', seller_id=s.seller_id) }}" method="POST" data-confirm="Duyệt shop {{ s.shop_name }}?"><button type="submit" class="btn btn-sm btn-success">Duyệt</button></form>
+                        <form action="{{ url_for('reject_seller', seller_id=s.seller_id) }}" method="POST" data-confirm="Từ chối hồ sơ shop {{ s.shop_name }}?"><button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button></form>
+                    </div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">Không có hồ sơ shop nào chờ duyệt.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- SẢN PHẨM CHỜ DUYỆT -->
+    <div class="col-md-7">
+        <div class="card p-3 shadow-sm border-0 h-100">
+            <h5 class="fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i>Kiểm duyệt Sản phẩm &amp; Ảnh <span class="badge bg-primary">{{ products|length }}</span></h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Ảnh xem trước</th><th>Thông tin SP</th><th>Thao tác</th></tr></thead>
+                    <tbody>
+                        {% for p in products %}
+                        <tr>
+                            <td width="90">{{ thumb(p.image_url, 70) }}</td>
+                            <td><strong>{{ p.product_name }}</strong><br><small class="text-muted">Shop: {{ p.shop_name }}</small></td>
+                            <td class="text-nowrap">
+                                <form action="{{ url_for('approve_product', product_id=p.product_id) }}" method="POST" class="d-inline" data-confirm="Duyệt sản phẩm này?"><button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> Duyệt</button></form>
+                                <form action="{{ url_for('reject_product', product_id=p.product_id) }}" method="POST" class="d-inline" data-confirm="Từ chối sản phẩm này?"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i> Từ chối</button></form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted text-center py-3">Không có sản phẩm nào chờ duyệt.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-1">
+    <!-- DANH MỤC & THƯƠNG HIỆU -->
+    <div class="col-md-6">
+        <div class="card p-3 shadow-sm border-0 mb-3">
+            <h6 class="fw-bold">Danh mục sản phẩm</h6>
+            <form action="{{ url_for('admin_add_category') }}" method="POST" class="d-flex mb-2">
+                <input type="text" name="categories_name" class="form-control me-2" placeholder="Tên danh mục mới" required maxlength="150">
+                <button type="submit" class="btn btn-primary btn-sm text-nowrap">Thêm</button>
+            </form>
+            <div class="chip-list">
+                {% for c in categories %}
+                <span class="chip">{{ c.categories_name }} <small class="text-muted">({{ c.n }})</small>
+                    <form action="{{ url_for('admin_delete_category', cat_id=c.categories_id) }}" method="POST" class="d-inline" data-confirm="Xóa danh mục {{ c.categories_name }}?"><button type="submit" class="chip-x" data-no-loading aria-label="Xóa danh mục"><i class="bi bi-x"></i></button></form>
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card p-3 shadow-sm border-0">
+            <h6 class="fw-bold">Thương hiệu</h6>
+            <form action="{{ url_for('admin_add_brand') }}" method="POST" class="mb-2">
+                <input type="text" name="brand_name" class="form-control mb-2" placeholder="Tên thương hiệu" required maxlength="150">
+                <input type="text" name="company_name" class="form-control mb-2" placeholder="Tên công ty">
+                <button type="submit" class="btn btn-primary btn-sm w-100">Thêm Thương hiệu</button>
+            </form>
+            <div class="chip-list">
+                {% for b in brands %}
+                <span class="chip">{{ b.brand_name }} <small class="text-muted">({{ b.n }})</small>
+                    <form action="{{ url_for('admin_delete_brand', brand_id=b.brand_id) }}" method="POST" class="d-inline" data-confirm="Xóa thương hiệu {{ b.brand_name }}? Sản phẩm vẫn được giữ lại."><button type="submit" class="chip-x" data-no-loading aria-label="Xóa thương hiệu"><i class="bi bi-x"></i></button></form>
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- QUẢN LÝ TÀI KHOẢN -->
+    <div class="col-md-6">
+        <div class="card p-3 shadow-sm border-0">
+            <h5 class="fw-bold"><i class="bi bi-people me-2"></i>Quản lý Tài khoản Khách hàng</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>User</th><th>Tên</th><th>Hạng</th><th>Trạng thái</th><th></th></tr></thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>{{ u.username }}</td>
+                            <td>{{ u.full_name }}</td>
+                            <td><small>{{ u.rank_name or '-' }}</small></td>
+                            <td>{% if u.status == 'Hoat dong' %}<span class="badge bg-success">Hoạt động</span>{% else %}<span class="badge bg-danger">Đã khóa</span>{% endif %}</td>
+                            <td>
+                                <form action="{{ url_for('admin_toggle_user', user_id=u.user_id) }}" method="POST" data-confirm="Đổi trạng thái tài khoản {{ u.username }}?">
+                                    <button type="submit" class="btn btn-outline-dark btn-sm">{% if u.status == 'Hoat dong' %}Khóa{% else %}Mở khóa{% endif %}</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card p-3 shadow-sm border-0 mt-3">
+    <h5 class="fw-bold">Hoa hồng riêng theo danh mục và sản phẩm</h5>
+    <p class="small text-muted">Thứ tự ưu tiên: sản phẩm → shop → danh mục → tỷ lệ mặc định. Để trống để kế thừa mức phía sau.</p>
+    <h6 class="fw-semibold">Theo danh mục</h6>
+    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Danh mục</th><th>Tỷ lệ (%)</th><th>Lưu</th></tr></thead><tbody>
+    {% for c in categories %}<tr><td>{{ c.categories_name }}</td><td><form class="d-flex gap-2" method="POST" action="{{ url_for('admin_category_commission', category_id=c.categories_id) }}"><input class="form-control form-control-sm" type="number" name="commission_rate" min="0" max="100" step="0.01" value="{{ c.commission_rate if c.commission_rate is not none else '' }}" placeholder="Kế thừa mặc định"><button class="btn btn-sm btn-primary">Lưu</button></form></td><td></td></tr>{% endfor %}
+    </tbody></table></div>
+    <h6 class="fw-semibold mt-3">Theo shop (100 shop gần nhất)</h6>
+    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Shop</th><th>Hoa hồng (%)</th><th></th></tr></thead><tbody>
+    {% for sh in commission_sellers %}<tr><td>{{ sh.shop_name }}</td><td><form class="d-flex gap-2" method="POST" action="{{ url_for('admin_seller_commission', seller_id=sh.seller_id) }}"><input class="form-control form-control-sm" type="number" name="commission_rate" min="0" max="100" step="0.01" value="{{ sh.commission_rate if sh.commission_rate is not none else '' }}" placeholder="Kế thừa"><button class="btn btn-sm btn-primary">Lưu</button></form></td><td></td></tr>{% endfor %}
+    </tbody></table></div>
+    <h6 class="fw-semibold mt-3">Theo sản phẩm (100 sản phẩm gần nhất)</h6>
+    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Sản phẩm</th><th>Shop</th><th>Hoa hồng (%)</th><th></th></tr></thead><tbody>
+    {% for p in commission_products %}<tr><td>{{ p.product_name }}</td><td>{{ p.shop_name }}</td><td><form class="d-flex gap-2" method="POST" action="{{ url_for('admin_product_commission', product_id=p.product_id) }}"><input class="form-control form-control-sm" type="number" name="commission_rate" min="0" max="100" step="0.01" value="{{ p.commission_rate if p.commission_rate is not none else '' }}" placeholder="Kế thừa"><button class="btn btn-sm btn-primary">Lưu</button></form></td><td></td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

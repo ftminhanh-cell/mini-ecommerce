@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Đăng nhập - Mini Shop{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card p-4 shadow-sm border-0">
+            <h3 class="text-center mb-3">Đăng nhập</h3>
+            <form method="POST">
+                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+                <div class="mb-3">
+                    <label class="form-label" for="username">Tên đăng nhập</label>
+                    <input type="text" id="username" name="username" class="form-control" required autofocus autocomplete="username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="password">Mật khẩu</label>
+                    <div class="input-group">
+                        <input type="password" id="password" name="password" class="form-control" required autocomplete="current-password">
+                        <button class="btn btn-outline-secondary" type="button" data-toggle-password="#password" aria-label="Hiện mật khẩu" aria-pressed="false"><i class="bi bi-eye"></i></button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Đăng nhập</button>
+            </form>
+            <p class="text-center text-muted small mt-3 mb-0">Chưa có tài khoản? <a href="{{ url_for('register') }}">Đăng ký</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

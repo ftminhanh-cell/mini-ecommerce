@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "macros.html" import status_badge, pay_badge %}
+{% block title %}Đơn hàng của tôi - Mini Shop{% endblock %}
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Đơn Hàng Của Tôi</h3>
+
+<ul class="nav nav-pills mb-3 bg-white p-2 rounded-3 shadow-sm status-tabs">
+    {% for key, label in [('', 'Tất cả'), ('Cho xac nhan', 'Chờ xác nhận'), ('Da xac nhan', 'Đã xác nhận'), ('Dang giao', 'Đang giao'), ('Da giao', 'Đã giao'), ('Da huy', 'Đã hủy')] %}
+    <li class="nav-item"><a class="nav-link {% if status == key %}active{% endif %}" href="{{ url_for('my_orders', status=key) if key else url_for('my_orders') }}">{{ label }}</a></li>
+    {% endfor %}
+</ul>
+
+{% for o in orders %}
+<div class="panel mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2 border-bottom bg-light">
+        <div>
+            <a href="{{ url_for('order_detail', order_id=o.order_id) }}" class="fw-bold text-decoration-none">Đơn #{{ o.order_id }}</a>
+            <small class="text-muted ms-2">{{ o.order_date.strftime('%d/%m/%Y %H:%M') }}</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">{{ pay_badge(o.payment_status) }} {{ status_badge(o.status) }}</div>
+    </div>
+
+    {% for it in o['items'] %}
+    <div class="order-item">
+        <a href="{{ url_for('product_detail', product_id=it.product_id) }}">
+            {% if it.image_url %}<img src="{{ url_for('static', filename='uploads/' ~ it.image_url) }}" class="cart-img" alt="" loading="lazy">
+            {% else %}<span class="cart-img cart-img-empty"><i class="bi bi-image"></i></span>{% endif %}
+        </a>
+        <div class="flex-grow-1 min-w-0">
+            <a href="{{ url_for('product_detail', product_id=it.product_id) }}" class="fw-semibold text-reset text-decoration-none line-clamp-2">{{ it.product_name }}</a>
+            <div><small class="text-muted">Size: {{ it.size or '-' }} | Màu: {{ it.color or '-' }} | x{{ it.quantity }}</small></div>
+        </div>
+        <div class="text-end">
+            <div>{{ it.unit_price|vnd }}</div>
+            {% if o.status == 'Da giao' %}
+                {% if it.review_id %}
+                <small class="text-success"><i class="bi bi-check-circle"></i> Đã đánh giá</small>
+                {% else %}
+                <button type="button" class="btn btn-sm btn-success mt-1" data-bs-toggle="modal" data-bs-target="#reviewModal{{ it.order_detail_id }}"><i class="bi bi-star"></i> Đánh giá</button>
+                <div class="modal fade" id="reviewModal{{ it.order_detail_id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <form action="{{ url_for('add_review') }}" method="POST" class="modal-content text-start">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Đánh giá: {{ it.product_name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                      </div>
+                      <div class="modal-body">
+                        <input type="hidden" name="order_detail_id" value="{{ it.order_detail_id }}">
+                        <div class="mb-3">
+                            <label class="form-label">Chọn số sao:</label>
+                            <select name="rating" class="form-select" required>
+                                <option value="5">5 Sao - Rất hài lòng</option>
+                                <option value="4">4 Sao - Hài lòng</option>
+                                <option value="3">3 Sao - Bình thường</option>
+                                <option value="2">2 Sao - Không hài lòng</option>
+                                <option value="1">1 Sao - Rất tệ</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nhận xét:</label>
+                            <textarea name="comment" class="form-control" rows="3" maxlength="1000" placeholder="Viết cảm nhận của bạn..."></textarea>
+                        </div>
+                      </div>
+                      <div class="modal-footer"><button type="submit" class="btn btn-primary">Gửi đánh giá</button></div>
+                    </form>
+                  </div>
+                </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2 border-top">
+        <small class="text-muted"><i class="bi bi-geo-alt"></i> {{ o.shipping_address }}</small>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span>Thành tiền: <strong class="text-danger fs-6">{{ o.final_amount|vnd }}</strong></span>
+            <a href="{{ url_for('order_detail', order_id=o.order_id) }}" class="btn btn-sm btn-outline-primary">Chi tiết</a>
+            <form action="{{ url_for('reorder', order_id=o.order_id) }}" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat"></i> Mua lại</button>
+            </form>
+            {% if o.status == 'Cho xac nhan' %}
+            <form action="{{ url_for('cancel_order', order_id=o.order_id) }}" method="POST" class="d-inline" data-confirm="Hủy đơn hàng này? Hàng sẽ được hoàn lại vào kho.">
+                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Hủy đơn</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="panel text-center py-5 px-3">
+    <i class="bi bi-bag fs-1 text-muted"></i>
+    <p class="mt-2 mb-1 fw-semibold">{% if status %}Không có đơn hàng nào ở trạng thái này.{% else %}Bạn chưa mua đơn hàng nào.{% endif %}</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Mua sắm ngay</a>
+</div>
+{% endfor %}
+{% endblock %}

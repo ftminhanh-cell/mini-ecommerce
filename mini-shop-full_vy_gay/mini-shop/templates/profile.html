@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Tài khoản của tôi - Mini Shop{% endblock %}
+{% block content %}
+{% set p = profile or {} %}
+{% set name = p.full_name or session.user.name %}
+{% set is_admin = session.user.role == 'admin' %}
+
+<div class="row g-3">
+    <aside class="col-lg-4 col-xl-3">
+        <div class="panel profile-side">
+            <div class="profile-cover"></div>
+            <span class="avatar avatar-lg">
+                {% if p.avatar_url %}<img src="{{ url_for('static', filename='uploads/' ~ p.avatar_url) }}" alt="Ảnh đại diện">{% else %}{{ (name or '?')[:1]|upper }}{% endif %}
+            </span>
+            <h1 class="profile-name px-3">{{ name }}</h1>
+            <div class="profile-sub">{% if p.username %}@{{ p.username }}{% endif %}</div>
+            <span class="badge rounded-pill mt-2 {{ 'text-bg-dark' if is_admin else 'text-bg-light border' }}">
+                {% if is_admin %}{{ p.roles_name or 'Quản trị viên' }}{% else %}<i class="bi bi-award me-1"></i>Hạng {{ p.rank_name or 'Thành viên' }}{% endif %}
+            </span>
+
+            {% if not is_admin %}
+            <form action="{{ url_for('profile_avatar') }}" method="POST" enctype="multipart/form-data" class="px-3 mt-3 text-start">
+                <input type="file" name="avatar" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp,image/gif" data-preview="#avatar-preview" aria-label="Chọn ảnh đại diện">
+                <img id="avatar-preview" class="img-preview d-none mt-2" alt="Xem trước ảnh đại diện">
+                <div class="d-flex gap-2 mt-2">
+                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Đổi ảnh</button>
+                    {% if p.avatar_url %}<button type="submit" name="remove" value="1" class="btn btn-sm btn-outline-danger" data-no-loading data-confirm="Xóa ảnh đại diện?">Xóa</button>{% endif %}
+                </div>
+            </form>
+            {% endif %}
+
+            <nav class="profile-nav" aria-label="Menu tài khoản">
+                <a class="active" href="{{ url_for('profile') }}"><i class="bi bi-person"></i>Thông tin cá nhân</a>
+                {% if is_admin %}
+                <a href="{{ url_for('admin_panel') }}"><i class="bi bi-shield-lock"></i>Quản trị</a>
+                {% else %}
+                <a href="{{ url_for('my_orders') }}"><i class="bi bi-bag-check"></i>Đơn hàng của tôi</a>
+                <a href="{{ url_for('cart') }}"><i class="bi bi-cart3"></i>Giỏ hàng</a>
+                <a href="{{ url_for('wishlist') }}"><i class="bi bi-heart"></i>Yêu thích</a>
+                <a href="{{ url_for('seller_channel') }}"><i class="bi bi-shop-window"></i>Kênh người bán</a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="text-danger"><i class="bi bi-box-arrow-right"></i>Đăng xuất</a>
+            </nav>
+        </div>
+    </aside>
+
+    <section class="col-lg-8 col-xl-9">
+        {% if not is_admin %}
+        <div class="row g-3 mb-3">
+            <div class="col-4"><div class="stat-tile"><span class="stat-num">{{ stats.orders }}</span><span class="stat-label">Đơn hàng</span></div></div>
+            <div class="col-4"><div class="stat-tile"><span class="stat-num">{{ stats.spent|vnd }}</span><span class="stat-label">Đã chi tiêu</span></div></div>
+            <div class="col-4"><div class="stat-tile"><span class="stat-num">{{ stats.wishlist }}</span><span class="stat-label">Yêu thích</span></div></div>
+        </div>
+        <div class="panel p-3 mb-3">
+            <div class="d-flex justify-content-between flex-wrap gap-1">
+                <strong><i class="bi bi-award text-warning me-1"></i>Hạng {{ p.rank_name or 'Thành viên' }}{% if p.discount_rate %} · giảm {{ p.discount_rate|int }}% mọi đơn{% endif %}</strong>
+                {% if next_rank %}<small class="text-muted">Còn {{ (next_rank.min_spent - stats.spent)|vnd }} để lên hạng {{ next_rank.rank_name }} (giảm {{ next_rank.discount_rate|int }}%)</small>
+                {% else %}<small class="text-success">Bạn đang ở hạng cao nhất</small>{% endif %}
+            </div>
+            {% if next_rank %}
+            {% set pct = ((stats.spent / next_rank.min_spent) * 100)|int if next_rank.min_spent else 100 %}
+            <div class="progress mt-2" style="height:8px" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width: {{ pct }}%"></div></div>
+            {% endif %}
+            <small class="text-muted d-block mt-2">Hạng được tự động nâng khi tổng giá trị các đơn đã giao đạt mốc.</small>
+        </div>
+        {% endif %}
+
+        <div class="panel mb-3">
+            <div class="panel-title">Thông tin cá nhân</div>
+            {% macro row(label, value, fallback='Chưa cập nhật') %}
+            <div class="info-row">
+                <div class="info-label">{{ label }}</div>
+                <div class="info-value {% if not value %}is-empty{% endif %}">{{ value or fallback }}</div>
+            </div>
+            {% endmacro %}
+            {{ row('Họ và tên', name) }}
+            {{ row('Tên đăng nhập', p.username) }}
+            {{ row('Email', p.email) }}
+            {{ row('Số điện thoại', p.phone) }}
+            {% if not is_admin %}{{ row('Địa chỉ', p.address) }}{% endif %}
+            {% if shop is defined and shop %}{{ row('Shop', shop.shop_name ~ ('' if shop.approved_at else ' (chờ duyệt)')) }}{% endif %}
+            {{ row('Ngày tham gia', p.created_at.strftime('%d/%m/%Y') if p.created_at else None, '—') }}
+        </div>
+
+        {% if not is_admin %}
+        <div class="panel mb-3">
+            <div class="panel-title">Cập nhật thông tin</div>
+            <form action="{{ url_for('profile_update') }}" method="POST" class="p-3">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="full_name">Họ và tên</label>
+                        <input type="text" id="full_name" name="full_name" class="form-control" value="{{ p.full_name }}" required minlength="2" maxlength="100" autocomplete="name">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="phone">Số điện thoại</label>
+                        <input type="tel" id="phone" name="phone" class="form-control" value="{{ p.phone or '' }}" required pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" inputmode="numeric" autocomplete="tel">
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label" for="email">Email</label>
+                        <input type="email" id="email" name="email" class="form-control" value="{{ p.email }}" required autocomplete="email">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="address">Địa chỉ nhận hàng mặc định</label>
+                        <input type="text" id="address" name="address" class="form-control" value="{{ p.address or '' }}" required maxlength="255" autocomplete="street-address">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-save me-1"></i>Lưu thay đổi</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="panel">
+            <div class="panel-title">Đổi mật khẩu</div>
+            <form action="{{ url_for('profile_password') }}" method="POST" class="p-3">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="old_password">Mật khẩu hiện tại</label>
+                        <input type="password" id="old_password" name="old_password" class="form-control" required autocomplete="current-password">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="new_password">Mật khẩu mới</label>
+                        <input type="password" id="new_password" name="new_password" class="form-control" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="confirm_password">Nhập lại mật khẩu mới</label>
+                        <input type="password" id="confirm_password" name="confirm_password" class="form-control" required minlength="6" autocomplete="new-password">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-outline-primary mt-3"><i class="bi bi-key me-1"></i>Đổi mật khẩu</button>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}
